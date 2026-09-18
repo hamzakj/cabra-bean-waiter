@@ -385,9 +385,9 @@ class _MenuCatalog extends StatelessWidget {
                       padding: EdgeInsets.fromLTRB(14, 14, 14, isMobile ? 85 : 14),
                       gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                         maxCrossAxisExtent: isMobile ? 240 : 280,
-                        mainAxisSpacing: 14,
-                        crossAxisSpacing: 14,
-                        childAspectRatio: 0.76,
+                        mainAxisSpacing: 10,
+                        crossAxisSpacing: 10,
+                        childAspectRatio: isMobile ? 1.08 : 1.10,
                       ),
                       itemCount: menuProvider.filteredItems.length,
                       itemBuilder: (context, index) {
@@ -463,7 +463,7 @@ class _MenuItemCard extends StatelessWidget {
           );
         },
         child: Padding(
-          padding: const EdgeInsets.all(12),
+          padding: const EdgeInsets.fromLTRB(10, 8, 10, 8),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -473,29 +473,29 @@ class _MenuItemCard extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 28,
+                    height: 28,
                     decoration: BoxDecoration(
                       color: AppTheme.primaryAmber.withOpacity(0.14),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Icon(
                       Icons.coffee_rounded,
                       color: AppTheme.primaryCoffee,
-                      size: 22,
+                      size: 16,
                     ),
                   ),
                   if (inCartQty > 0)
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
                       decoration: BoxDecoration(
                         color: AppTheme.statusGreen,
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
                         '$inCartQty ${isAr ? 'بالسلة' : 'in cart'} ✓',
                         style: const TextStyle(
-                          fontSize: 11.5,
+                          fontSize: 10.5,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                         ),
@@ -503,7 +503,7 @@ class _MenuItemCard extends StatelessWidget {
                     )
                   else
                     Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                       decoration: BoxDecoration(
                         color: AppTheme.cardLatte,
                         borderRadius: BorderRadius.circular(6),
@@ -512,7 +512,7 @@ class _MenuItemCard extends StatelessWidget {
                       child: Text(
                         AppStrings.get('cat_${item.category}', lang),
                         style: const TextStyle(
-                          fontSize: 11,
+                          fontSize: 10,
                           fontWeight: FontWeight.bold,
                           color: AppTheme.primaryCoffee,
                         ),
@@ -527,22 +527,22 @@ class _MenuItemCard extends StatelessWidget {
                 children: [
                   Text(
                     item.getName(lang),
-                    maxLines: 2,
+                    maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       fontWeight: FontWeight.bold,
-                      fontSize: 17.5,
+                      fontSize: 15.5,
                       color: AppTheme.textDark,
-                      height: 1.25,
+                      height: 1.2,
                     ),
                   ),
-                  const SizedBox(height: 3),
+                  const SizedBox(height: 1.5),
                   Text(
                     isAr ? item.nameEn : item.nameAr,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                      fontSize: 13,
+                      fontSize: 11.5,
                       color: AppTheme.textMuted,
                     ),
                   ),
@@ -552,7 +552,7 @@ class _MenuItemCard extends StatelessWidget {
               // Bottom Area: Quick 1-Tap Size Buttons OR Single Add Button
               Column(
                 children: [
-                  const Divider(height: 12, color: AppTheme.borderSubtle),
+                  const Divider(height: 8, color: AppTheme.borderSubtle),
 
                   // If multiple sizes, show 1-Tap Size Buttons
                   if (item.availableSizes.length > 1) ...[
@@ -564,12 +564,12 @@ class _MenuItemCard extends StatelessWidget {
                             padding: const EdgeInsets.symmetric(horizontal: 2),
                             child: InkWell(
                               onTap: () => _quickAddSize(context, size),
-                              borderRadius: BorderRadius.circular(8),
+                              borderRadius: BorderRadius.circular(6),
                               child: Container(
-                                padding: const EdgeInsets.symmetric(vertical: 6),
+                                padding: const EdgeInsets.symmetric(vertical: 3.5),
                                 decoration: BoxDecoration(
                                   color: AppTheme.cardLatte,
-                                  borderRadius: BorderRadius.circular(8),
+                                  borderRadius: BorderRadius.circular(6),
                                   border: Border.all(color: AppTheme.primaryCoffee.withOpacity(0.3)),
                                 ),
                                 child: Column(
@@ -577,15 +577,15 @@ class _MenuItemCard extends StatelessWidget {
                                     Text(
                                       size,
                                       style: const TextStyle(
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.primaryCoffee,
                                       ),
                                     ),
                                     Text(
-                                      '${price.toStringAsFixed(2)}',
+                                      price.toStringAsFixed(2),
                                       style: const TextStyle(
-                                        fontSize: 12.5,
+                                        fontSize: 11.5,
                                         fontWeight: FontWeight.bold,
                                         color: AppTheme.textDark,
                                       ),
@@ -598,7 +598,7 @@ class _MenuItemCard extends StatelessWidget {
                         );
                       }).toList(),
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     // Customize / Add-on Link
                     InkWell(
                       onTap: () {
@@ -610,12 +610,12 @@ class _MenuItemCard extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.tune, size: 14, color: AppTheme.primaryAmber),
-                          const SizedBox(width: 4),
+                          const Icon(Icons.tune, size: 13, color: AppTheme.primaryAmber),
+                          const SizedBox(width: 3),
                           Text(
                             isAr ? 'تخصيص وإضافات ⚙️' : 'Customize ⚙️',
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 10.5,
                               color: AppTheme.primaryCoffee,
                               fontWeight: FontWeight.bold,
                             ),
@@ -631,30 +631,30 @@ class _MenuItemCard extends StatelessWidget {
                         Text(
                           '${item.getPrice(item.availableSizes.first).toStringAsFixed(2)} $currency',
                           style: const TextStyle(
-                            fontSize: 16.5,
+                            fontSize: 15,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.primaryCoffee,
                           ),
                         ),
                         ElevatedButton.icon(
                           onPressed: () => _quickAddSize(context, item.availableSizes.first),
-                          icon: const Icon(Icons.add, size: 18, color: Colors.white),
+                          icon: const Icon(Icons.add, size: 16, color: Colors.white),
                           label: Text(
                             isAr ? 'إضافة' : 'Add',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
                           ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppTheme.primaryCoffee,
                             foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             minimumSize: Size.zero,
                             tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                           ),
                         ),
                       ],
                     ),
-                    const SizedBox(height: 6),
+                    const SizedBox(height: 4),
                     InkWell(
                       onTap: () {
                         showDialog(
@@ -665,12 +665,12 @@ class _MenuItemCard extends StatelessWidget {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.tune, size: 14, color: AppTheme.primaryAmber),
-                          const SizedBox(width: 4),
+                          const Icon(Icons.tune, size: 13, color: AppTheme.primaryAmber),
+                          const SizedBox(width: 3),
                           Text(
                             isAr ? 'تخصيص وإضافات ⚙️' : 'Customize ⚙️',
                             style: const TextStyle(
-                              fontSize: 11.5,
+                              fontSize: 10.5,
                               color: AppTheme.primaryCoffee,
                               fontWeight: FontWeight.bold,
                             ),
