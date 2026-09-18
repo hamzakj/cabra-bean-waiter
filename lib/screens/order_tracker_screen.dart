@@ -11,7 +11,8 @@ import '../services/whatsapp_service.dart';
 import '../services/wifi_printer_service.dart';
 
 class OrderTrackerScreen extends StatelessWidget {
-  const OrderTrackerScreen({super.key});
+  final bool isEmbedded;
+  const OrderTrackerScreen({super.key, this.isEmbedded = false});
 
   Color _getStatusColor(String status) {
     switch (status) {
@@ -145,15 +146,17 @@ class OrderTrackerScreen extends StatelessWidget {
     final statuses = ['all', 'new', 'preparing', 'served', 'completed'];
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppStrings.get('order_tracker', lang)),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: () => ordersProvider.loadOrders(),
-          ),
-        ],
-      ),
+      appBar: isEmbedded
+          ? null
+          : AppBar(
+              title: Text(AppStrings.get('order_tracker', lang)),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.refresh),
+                  onPressed: () => ordersProvider.loadOrders(),
+                ),
+              ],
+            ),
       body: Column(
         children: [
           // Filter Chips Bar

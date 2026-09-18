@@ -13,7 +13,8 @@ import 'addons_management_screen.dart';
 import 'menu_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  final bool isEmbedded;
+  const SettingsScreen({super.key, this.isEmbedded = false});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -133,9 +134,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = Provider.of<SettingsProvider>(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: Text(AppStrings.get('settings_title', lang)),
-      ),
+      appBar: widget.isEmbedded
+          ? null
+          : AppBar(
+              title: Text(AppStrings.get('settings_title', lang)),
+            ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(18),
         child: Center(

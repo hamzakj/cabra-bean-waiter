@@ -16,9 +16,17 @@ import 'tables_management_screen.dart';
 import 'categories_management_screen.dart';
 import 'addons_management_screen.dart';
 import 'settings_screen.dart';
+import 'tables_status_tab.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  int _currentIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -27,9 +35,74 @@ class HomeScreen extends StatelessWidget {
     final ordersProvider = Provider.of<OrdersProvider>(context);
     final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
     final menuProvider = Provider.of<MenuProvider>(context);
+    final activeOrdersCount = ordersProvider.newCount + ordersProvider.preparingCount;
 
-    return Scaffold(
-      appBar: AppBar(
+    PreferredSizeWidget buildAppBar() {
+      if (_currentIndex == 1) {
+        return AppBar(
+          title: Row(
+            children: [
+              const Icon(Icons.table_restaurant_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Text(isAr ? 'حالة وإشغال الطاولات' : 'Tables Status'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.edit_note_rounded),
+              tooltip: isAr ? 'إدارة الطاولات' : 'Manage Tables',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const TablesManagementScreen()),
+                );
+              },
+            ),
+            _languageButton(localeProvider, isAr),
+            const SizedBox(width: 4),
+          ],
+        );
+      }
+
+      if (_currentIndex == 2) {
+        return AppBar(
+          title: Row(
+            children: [
+              const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Text(isAr ? 'متابعة الطلبات' : 'Orders Tracker'),
+            ],
+          ),
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.refresh),
+              tooltip: isAr ? 'تحديث' : 'Refresh',
+              onPressed: () => ordersProvider.loadOrders(),
+            ),
+            _languageButton(localeProvider, isAr),
+            const SizedBox(width: 4),
+          ],
+        );
+      }
+
+      if (_currentIndex == 3) {
+        return AppBar(
+          title: Row(
+            children: [
+              const Icon(Icons.settings_rounded, color: Colors.white, size: 22),
+              const SizedBox(width: 10),
+              Text(isAr ? 'الإعدادات العامة والطباعة' : 'Settings'),
+            ],
+          ),
+          actions: [
+            _languageButton(localeProvider, isAr),
+            const SizedBox(width: 4),
+          ],
+        );
+      }
+
+      // Default Menu AppBar (_currentIndex == 0)
+      return AppBar(
         titleSpacing: 10,
         title: Row(
           children: [
@@ -74,61 +147,9 @@ class HomeScreen extends StatelessWidget {
           ],
         ),
         actions: [
-          // Order Tracker with badge
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              IconButton(
-                icon: const Icon(Icons.receipt_long_rounded),
-                tooltip: AppStrings.get('orders', lang),
-                onPressed: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const OrderTrackerScreen()),
-                  );
-                },
-              ),
-              if (ordersProvider.newCount + ordersProvider.preparingCount > 0)
-                Positioned(
-                  top: 8,
-                  right: isAr ? null : 8,
-                  left: isAr ? 8 : null,
-                  child: Container(
-                    padding: const EdgeInsets.all(4),
-                    decoration: const BoxDecoration(
-                      color: AppTheme.primaryAmber,
-                      shape: BoxShape.circle,
-                    ),
-                    constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                    child: Text(
-                      '${ordersProvider.newCount + ordersProvider.preparingCount}',
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
-          ),
-
-          // Tables Management
-          IconButton(
-            icon: const Icon(Icons.table_restaurant_outlined),
-            tooltip: AppStrings.get('tables', lang),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const TablesManagementScreen()),
-              );
-            },
-          ),
-
           // Menu & Categories & Addons Popup Menu
           PopupMenuButton<String>(
-            icon: const Icon(Icons.restaurant_menu_rounded),
+            icon: const Icon(Icons.menu_book_rounded),
             tooltip: isAr ? 'إدارة المنيو والتصنيفات' : 'Menu & Catalog',
             onSelected: (val) {
               if (val == 'menu') {
@@ -182,38 +203,29 @@ class HomeScreen extends StatelessWidget {
             ],
           ),
 
-          // Language Switcher
-          IconButton(
-            icon: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-              decoration: BoxDecoration(
-                border: Border.all(color: Colors.white, width: 1.2),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Text(
-                isAr ? 'EN' : 'عربي',
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
-              ),
-            ),
-            tooltip: 'تبديل اللغة / Switch Language',
-            onPressed: () => localeProvider.toggleLocale(),
-          ),
-
-          // Settings
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            tooltip: AppStrings.get('settings', lang),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
-            },
-          ),
+          _languageButton(localeProvider, isAr),
           const SizedBox(width: 4),
         ],
-      ),
-      body: LayoutBuilder(
+      );
+    }
+
+    Widget buildBody() {
+      if (_currentIndex == 1) {
+        return TablesStatusTab(
+          onSwitchToMenu: (tab) => setState(() => _currentIndex = tab),
+        );
+      }
+
+      if (_currentIndex == 2) {
+        return const OrderTrackerScreen(isEmbedded: true);
+      }
+
+      if (_currentIndex == 3) {
+        return const SettingsScreen(isEmbedded: true);
+      }
+
+      // Tab 0: Menu Catalog View
+      return LayoutBuilder(
         builder: (context, constraints) {
           final isTablet = constraints.maxWidth >= 750;
 
@@ -247,7 +259,87 @@ class HomeScreen extends StatelessWidget {
             );
           }
         },
+      );
+    }
+
+    return Scaffold(
+      appBar: buildAppBar(),
+      body: buildBody(),
+      bottomNavigationBar: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.08),
+              blurRadius: 10,
+              offset: const Offset(0, -3),
+            ),
+          ],
+        ),
+        child: BottomNavigationBar(
+          currentIndex: _currentIndex,
+          onTap: (index) => setState(() => _currentIndex = index),
+          selectedItemColor: AppTheme.primaryAmber,
+          unselectedItemColor: Colors.grey.shade600,
+          backgroundColor: Colors.white,
+          type: BottomNavigationBarType.fixed,
+          selectedFontSize: 13,
+          unselectedFontSize: 11.5,
+          selectedLabelStyle: const TextStyle(fontWeight: FontWeight.bold),
+          items: [
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.restaurant_menu_rounded),
+              activeIcon: const Icon(Icons.restaurant_menu_rounded, color: AppTheme.primaryAmber),
+              label: isAr ? 'المنيو والطلب' : 'Menu',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.table_restaurant_rounded),
+              activeIcon: const Icon(Icons.table_restaurant_rounded, color: AppTheme.primaryAmber),
+              label: isAr ? 'الطاولات' : 'Tables',
+            ),
+            BottomNavigationBarItem(
+              icon: activeOrdersCount > 0
+                  ? Badge(
+                      label: Text('$activeOrdersCount'),
+                      backgroundColor: AppTheme.primaryAmber,
+                      child: const Icon(Icons.receipt_long_rounded),
+                    )
+                  : const Icon(Icons.receipt_long_rounded),
+              activeIcon: activeOrdersCount > 0
+                  ? Badge(
+                      label: Text('$activeOrdersCount'),
+                      backgroundColor: AppTheme.primaryAmber,
+                      child: const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryAmber),
+                    )
+                  : const Icon(Icons.receipt_long_rounded, color: AppTheme.primaryAmber),
+              label: isAr ? 'الطلبات' : 'Orders',
+            ),
+            BottomNavigationBarItem(
+              icon: const Icon(Icons.settings_rounded),
+              activeIcon: const Icon(Icons.settings_rounded, color: AppTheme.primaryAmber),
+              label: isAr ? 'الإعدادات' : 'Settings',
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _languageButton(LocaleProvider localeProvider, bool isAr) {
+    return IconButton(
+      icon: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+        decoration: BoxDecoration(
+          border: Border.all(color: Colors.white, width: 1.2),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(
+          isAr ? 'EN' : 'عربي',
+          style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold),
+        ),
+      ),
+      tooltip: 'تبديل اللغة / Switch Language',
+      onPressed: () => localeProvider.toggleLocale(),
     );
   }
 }
