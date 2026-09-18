@@ -8,6 +8,7 @@ import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/whatsapp_service.dart';
+import '../services/wifi_printer_service.dart';
 
 class OrderTrackerScreen extends StatelessWidget {
   const OrderTrackerScreen({super.key});
@@ -397,12 +398,48 @@ class OrderTrackerScreen extends StatelessWidget {
                                         ],
                                       ),
                                       Wrap(
-                                        spacing: 8,
-                                        runSpacing: 6,
-                                        alignment: WrapAlignment.end,
-                                        children: [
-                                          // Dedicated "إرسال الفاتورة النهائية" Button
-                                          if (isActive)
+                                      spacing: 8,
+                                      runSpacing: 6,
+                                      alignment: WrapAlignment.end,
+                                      children: [
+                                        // Wi-Fi Print Bill Button
+                                        OutlinedButton.icon(
+                                          onPressed: () async {
+                                            final printRes = await WifiPrinterService.printTableBill(
+                                              ip: settings.printerIp,
+                                              port: settings.printerPort,
+                                              cafeName: settings.cafeName,
+                                              tableName: order.tableName,
+                                              tableNumber: order.tableNumber,
+                                              items: order.items,
+                                              totalAmount: order.totalAmount,
+                                              orderId: order.id,
+                                              waiterName: order.waiterName.isNotEmpty ? order.waiterName : settings.waiterName,
+                                              generalNotes: order.generalNotes,
+                                            );
+                                            if (context.mounted) {
+                                              ScaffoldMessenger.of(context).showSnackBar(
+                                                SnackBar(
+                                                  content: Text(printRes.message),
+                                                  backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                                                  duration: const Duration(seconds: 4),
+                                                ),
+                                              );
+                                            }
+                                          },
+                                          icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 16),
+                                          label: Text(
+                                            isAr ? 'طباعة 🖨️' : 'Print 🖨️',
+                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primaryCoffee),
+                                          ),
+                                          style: OutlinedButton.styleFrom(
+                                            side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                          ),
+                                        ),
+
+                                        // Dedicated "إرسال الفاتورة النهائية" Button
+                                        if (isActive)
                                             ElevatedButton.icon(
                                               onPressed: () async {
                                                 await WhatsAppService.sendFinalBillToCashier(

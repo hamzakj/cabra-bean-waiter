@@ -9,6 +9,7 @@ import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/whatsapp_service.dart';
+import '../services/wifi_printer_service.dart';
 
 class CartPanel extends StatefulWidget {
   final bool isBottomSheet;
@@ -22,11 +23,61 @@ class CartPanel extends StatefulWidget {
 class _CartPanelState extends State<CartPanel> {
   final TextEditingController _notesController = TextEditingController();
   bool _isSubmitting = false;
+  bool _isPrinting = false;
 
   @override
   void dispose() {
     _notesController.dispose();
     super.dispose();
+  }
+
+  Future<void> _handlePrintCartBill(BuildContext context) async {
+    final cart = Provider.of<CartProvider>(context, listen: false);
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+
+    if (cart.selectedTable == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('الرجاء اختيار طاولة أولاً قبل الطباعة'),
+          backgroundColor: AppTheme.statusOrange,
+        ),
+      );
+      return;
+    }
+
+    if (cart.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('السلة فارغة. يرجى إضافة أصناف للطباعة'),
+          backgroundColor: AppTheme.statusOrange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isPrinting = true);
+    final result = await WifiPrinterService.printTableBill(
+      ip: settings.printerIp,
+      port: settings.printerPort,
+      cafeName: settings.cafeName,
+      tableName: cart.selectedTable!.nameAr,
+      tableNumber: cart.selectedTable!.number,
+      items: cart.items,
+      totalAmount: cart.totalAmount,
+      waiterName: settings.waiterName,
+      generalNotes: _notesController.text.trim(),
+    );
+    setState(() => _isPrinting = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
+          duration: const Duration(seconds: 4),
+        ),
+      );
+    }
   }
 
   Future<void> _handleSendOrder(BuildContext context) async {
@@ -104,6 +155,23 @@ class _CartPanelState extends State<CartPanel> {
         addedItemsOnly: isMerged ? result.addedItems : null,
         previousTotal: isMerged ? result.previousTotal : null,
       );
+
+      // Auto-print bill via Wi-Fi if enabled in settings
+      if (settings.autoPrintBill) {
+        WifiPrinterService.printTableBill(
+          ip: settings.printerIp,
+          port: settings.printerPort,
+          cafeName: settings.cafeName,
+          tableName: order.tableName,
+          tableNumber: order.tableNumber,
+          items: order.items,
+          totalAmount: order.totalAmount,
+          orderId: order.id,
+          waiterName: settings.waiterName,
+          generalNotes: generalNotes,
+          isAddition: isMerged,
+        );
+      }
 
       // Clear cart
       cart.clearCart();
@@ -197,6 +265,46 @@ class _CartPanelState extends State<CartPanel> {
                       backgroundColor: const Color(0xFF25D366),
                       foregroundColor: Colors.white,
                       elevation: 2,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                SizedBox(
+                  width: double.infinity,
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: () async {
+                      final printRes = await WifiPrinterService.printTableBill(
+                        ip: settings.printerIp,
+                        port: settings.printerPort,
+                        cafeName: settings.cafeName,
+                        tableName: order.tableName,
+                        tableNumber: order.tableNumber,
+                        items: order.items,
+                        totalAmount: order.totalAmount,
+                        orderId: order.id,
+                        waiterName: settings.waiterName,
+                        generalNotes: generalNotes,
+                        isAddition: isMerged,
+                      );
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text(printRes.message),
+                            backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                            duration: const Duration(seconds: 4),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 20),
+                    label: const Text(
+                      'طباعة الفاتورة (Wi-Fi) 🖨️',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
@@ -735,6 +843,31 @@ class _CartPanelState extends State<CartPanel> {
                               ),
                             ],
                           ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+
+                // Wi-Fi Print Bill Button
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
+                  child: OutlinedButton.icon(
+                    onPressed: _isPrinting ? null : () => _handlePrintCartBill(context),
+                    icon: _isPrinting
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryCoffee),
+                          )
+                        : const Icon(Icons.print_outlined, color: AppTheme.primaryCoffee, size: 20),
+                    label: Text(
+                      _isPrinting ? 'جاري إرسال الفاتورة...' : 'طباعة الفاتورة (Wi-Fi) 🖨️',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
                   ),
                 ),
               ],

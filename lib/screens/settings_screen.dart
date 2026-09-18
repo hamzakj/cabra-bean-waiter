@@ -7,6 +7,7 @@ import '../providers/tables_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/backup_service.dart';
+import '../services/wifi_printer_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -18,8 +19,11 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _phoneController = TextEditingController();
   final TextEditingController _waiterController = TextEditingController();
+  final TextEditingController _printerIpController = TextEditingController();
+  final TextEditingController _printerPortController = TextEditingController();
   bool _isExporting = false;
   bool _isImporting = false;
+  bool _isTestingPrinter = false;
 
   @override
   void initState() {
@@ -27,12 +31,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     _phoneController.text = settings.cashierPhone;
     _waiterController.text = settings.waiterName;
+    _printerIpController.text = settings.printerIp;
+    _printerPortController.text = settings.printerPort.toString();
   }
 
   @override
   void dispose() {
     _phoneController.dispose();
     _waiterController.dispose();
+    _printerIpController.dispose();
+    _printerPortController.dispose();
     super.dispose();
   }
 
@@ -86,6 +94,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
         );
       }
+    }
+  }
+
+  Future<void> _handleTestPrinter(BuildContext context, SettingsProvider settings) async {
+    final ip = _printerIpController.text.trim();
+    final port = int.tryParse(_printerPortController.text.trim()) ?? 9100;
+    await settings.setPrinterIp(ip);
+    await settings.setPrinterPort(port);
+
+    setState(() => _isTestingPrinter = true);
+    final result = await WifiPrinterService.printTest(
+      ip: ip,
+      port: port,
+      cafeName: settings.cafeName,
+    );
+    setState(() => _isTestingPrinter = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
+          duration: const Duration(seconds: 4),
+        ),
+      );
     }
   }
 
@@ -212,6 +245,122 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SnackBar(content: Text('تم حفظ اسم الويتر بنجاح')),
                                 );
                               },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // Wi-Fi Thermal Printer Settings Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 24),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'طابعة الفواتير (Wi-Fi Thermal Printer)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'قم بربط طابعة الإيصالات الحرارية (80mm/58mm) عبر شبكة الواي فاي لطباعة فواتير الطاولات مباشرة.',
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Printer IP
+                        TextField(
+                          controller: _printerIpController,
+                          keyboardType: TextInputType.datetime,
+                          decoration: InputDecoration(
+                            labelText: 'عنوان IP الطابعة (Printer IP)',
+                            hintText: '192.168.1.100',
+                            prefixIcon: const Icon(Icons.wifi, color: AppTheme.primaryAmber),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.save_outlined, color: AppTheme.primaryCoffee),
+                              tooltip: 'حفظ IP',
+                              onPressed: () {
+                                settings.setPrinterIp(_printerIpController.text);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم حفظ عنوان IP الطابعة')),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Printer Port
+                        TextField(
+                          controller: _printerPortController,
+                          keyboardType: TextInputType.number,
+                          decoration: InputDecoration(
+                            labelText: 'منفذ الطابعة (Port)',
+                            hintText: '9100',
+                            prefixIcon: const Icon(Icons.numbers, color: AppTheme.primaryAmber),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.save_outlined, color: AppTheme.primaryCoffee),
+                              tooltip: 'حفظ المنفذ',
+                              onPressed: () {
+                                final port = int.tryParse(_printerPortController.text.trim()) ?? 9100;
+                                settings.setPrinterPort(port);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم حفظ منفذ الطابعة')),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 14),
+
+                        // Auto-print toggle
+                        SwitchListTile(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'طباعة الفاتورة تلقائياً عند إرسال الطلب',
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: AppTheme.textDark),
+                          ),
+                          subtitle: Text(
+                            'يتم إرسال أمر الطباعة تلقائياً إلى طابعة الواي فاي بمجرد تسجيل طلب الطاولة',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                          value: settings.autoPrintBill,
+                          activeThumbColor: AppTheme.primaryAmber,
+                          onChanged: (val) => settings.setAutoPrintBill(val),
+                        ),
+                        const SizedBox(height: 12),
+
+                        // Test Print Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 48,
+                          child: OutlinedButton.icon(
+                            onPressed: _isTestingPrinter ? null : () => _handleTestPrinter(context, settings),
+                            icon: _isTestingPrinter
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2),
+                                  )
+                                : const Icon(Icons.receipt_long, color: AppTheme.primaryCoffee),
+                            label: Text(
+                              _isTestingPrinter ? 'جاري الفحص والإرسال...' : 'طباعة فاتورة تجريبية (فحص الاتصال) 🖨️',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            style: OutlinedButton.styleFrom(
+                              side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
                         ),
