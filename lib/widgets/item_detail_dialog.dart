@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/menu_item.dart';
+import '../models/addon_item.dart';
 import '../providers/cart_provider.dart';
+import '../providers/addons_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -19,7 +21,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
   late String _selectedSize;
   int _quantity = 1;
   final TextEditingController _notesController = TextEditingController();
-  final Set<String> _selectedQuickNotes = {};
+  final Set<AddonItem> _selectedAddons = {};
 
   @override
   void initState() {
@@ -40,67 +42,59 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
     super.dispose();
   }
 
-  void _toggleQuickNote(String note) {
+  void _toggleAddon(AddonItem addon) {
     setState(() {
-      if (_selectedQuickNotes.contains(note)) {
-        _selectedQuickNotes.remove(note);
+      final existing = _selectedAddons.where((a) => (a.id != null && a.id == addon.id) || a.nameAr == addon.nameAr);
+      if (existing.isNotEmpty) {
+        _selectedAddons.remove(existing.first);
       } else {
-        _selectedQuickNotes.add(note);
+        _selectedAddons.add(addon);
       }
     });
   }
 
-  String _getCombinedNotes() {
-    final custom = _notesController.text.trim();
-    final all = <String>[..._selectedQuickNotes];
-    if (custom.isNotEmpty) {
-      all.add(custom);
-    }
-    return all.join(' ، ');
+  bool _isAddonSelected(AddonItem addon) {
+    return _selectedAddons.any((a) => (a.id != null && a.id == addon.id) || a.nameAr == addon.nameAr);
   }
 
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LocaleProvider>(context).langCode;
     final isAr = lang == 'ar';
-    final unitPrice = widget.item.getPrice(_selectedSize);
+    final addonsProvider = Provider.of<AddonsProvider>(context);
+    final availableAddons = addonsProvider.getAddonsForCategory(widget.item.category);
+
+    final baseUnitPrice = widget.item.getPrice(_selectedSize);
+    final addonsTotal = _selectedAddons.fold(0.0, (sum, a) => sum + a.price);
+    final unitPrice = baseUnitPrice + addonsTotal;
     final totalPrice = unitPrice * _quantity;
     final currency = AppStrings.get('currency', lang);
-
-    final quickNotes = [
-      AppStrings.get('quick_notes_sugar_none', lang),
-      AppStrings.get('quick_notes_sugar_light', lang),
-      AppStrings.get('quick_notes_sugar_extra', lang),
-      AppStrings.get('quick_notes_no_ice', lang),
-      AppStrings.get('quick_notes_extra_ice', lang),
-      AppStrings.get('quick_notes_extra_shot', lang),
-    ];
 
     return Dialog(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       child: Container(
-        width: 480,
-        padding: const EdgeInsets.all(24),
+        width: 500,
+        padding: const EdgeInsets.all(22),
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Header
+              // Header: Icon + Names + Close
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Container(
-                    width: 50,
-                    height: 50,
+                    width: 54,
+                    height: 54,
                     decoration: BoxDecoration(
                       color: AppTheme.primaryAmber.withOpacity(0.12),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                     ),
                     child: const Icon(
                       Icons.coffee_rounded,
                       color: AppTheme.primaryCoffee,
-                      size: 28,
+                      size: 30,
                     ),
                   ),
                   const SizedBox(width: 14),
@@ -111,15 +105,16 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                         Text(
                           widget.item.getName(lang),
                           style: const TextStyle(
-                            fontSize: 18,
+                            fontSize: 19,
                             fontWeight: FontWeight.bold,
                             color: AppTheme.textDark,
                           ),
                         ),
+                        const SizedBox(height: 2),
                         Text(
                           isAr ? widget.item.nameEn : widget.item.nameAr,
                           style: const TextStyle(
-                            fontSize: 13,
+                            fontSize: 13.5,
                             color: AppTheme.textMuted,
                           ),
                         ),
@@ -144,19 +139,19 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                   ),
                   child: Text(
                     widget.item.description!,
-                    style: const TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                    style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
                   ),
                 ),
               ],
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 18),
 
               // Size Selector (if multiple sizes exist)
               if (widget.item.availableSizes.length > 1) ...[
                 Text(
-                  isAr ? 'الحجم المطلوب' : 'Select Size',
+                  isAr ? 'اختر الحجم المطلوب:' : 'Select Size:',
                   style: const TextStyle(
-                    fontSize: 14,
+                    fontSize: 15,
                     fontWeight: FontWeight.bold,
                     color: AppTheme.textDark,
                   ),
@@ -175,11 +170,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
                         child: InkWell(
-                          onTap: () {
-                            setState(() {
-                              _selectedSize = size;
-                            });
-                          },
+                          onTap: () => setState(() => _selectedSize = size),
                           borderRadius: BorderRadius.circular(12),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 180),
@@ -189,7 +180,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                               borderRadius: BorderRadius.circular(12),
                               border: Border.all(
                                 color: isSelected ? AppTheme.primaryAmber : AppTheme.borderSubtle,
-                                width: isSelected ? 1.8 : 1,
+                                width: isSelected ? 2 : 1,
                               ),
                             ),
                             child: Column(
@@ -197,7 +188,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                                 Text(
                                   label,
                                   style: TextStyle(
-                                    fontSize: 13,
+                                    fontSize: 14,
                                     fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                                     color: isSelected ? Colors.white : AppTheme.textDark,
                                   ),
@@ -206,7 +197,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                                 Text(
                                   '${sizePrice.toStringAsFixed(2)} $currency',
                                   style: TextStyle(
-                                    fontSize: 12,
+                                    fontSize: 13,
                                     fontWeight: FontWeight.bold,
                                     color: isSelected ? Colors.white : AppTheme.primaryCoffee,
                                   ),
@@ -222,57 +213,82 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                 const SizedBox(height: 20),
               ],
 
-              // Quick Notes
-              Text(
-                AppStrings.get('notes', lang),
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: AppTheme.textDark,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: 6,
-                children: quickNotes.map((note) {
-                  final isSelected = _selectedQuickNotes.contains(note);
-                  return FilterChip(
-                    label: Text(note),
-                    selected: isSelected,
-                    onSelected: (_) => _toggleQuickNote(note),
-                    backgroundColor: AppTheme.cardLatte,
-                    selectedColor: AppTheme.primaryAmber.withOpacity(0.2),
-                    checkmarkColor: AppTheme.primaryCoffee,
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                      color: isSelected ? AppTheme.primaryCoffee : AppTheme.textDark,
+              // Add-ons & Modifiers Section
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    isAr ? 'الإضافات والخيارات (مع السعر):' : 'Add-ons & Options:',
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textDark,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                      side: BorderSide(
-                        color: isSelected ? AppTheme.primaryAmber : AppTheme.borderSubtle,
+                  ),
+                  if (_selectedAddons.isNotEmpty)
+                    Text(
+                      '+${addonsTotal.toStringAsFixed(2)} $currency',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.primaryAmber,
                       ),
                     ),
-                  );
-                }).toList(),
+                ],
               ),
+              const SizedBox(height: 10),
+              if (availableAddons.isEmpty)
+                Text(
+                  isAr ? 'لا توجد إضافات مسجلة' : 'No add-ons available',
+                  style: const TextStyle(fontSize: 13, color: AppTheme.textMuted),
+                )
+              else
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: availableAddons.map((addon) {
+                    final isSelected = _isAddonSelected(addon);
+                    final isFree = addon.price <= 0.0;
+                    final priceLabel = isFree ? (isAr ? 'مجاني' : 'Free') : '+${addon.price.toStringAsFixed(2)} $currency';
 
-              const SizedBox(height: 12),
+                    return FilterChip(
+                      label: Text('${addon.getName(lang)} ($priceLabel)'),
+                      selected: isSelected,
+                      onSelected: (_) => _toggleAddon(addon),
+                      backgroundColor: AppTheme.cardLatte,
+                      selectedColor: AppTheme.primaryAmber.withOpacity(0.22),
+                      checkmarkColor: AppTheme.primaryCoffee,
+                      labelStyle: TextStyle(
+                        fontSize: 13,
+                        fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
+                        color: isSelected ? AppTheme.primaryCoffee : AppTheme.textDark,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                        side: BorderSide(
+                          color: isSelected ? AppTheme.primaryAmber : AppTheme.borderSubtle,
+                          width: isSelected ? 1.5 : 1,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+
+              const SizedBox(height: 16),
 
               // Custom Note TextField
               TextField(
                 controller: _notesController,
                 decoration: InputDecoration(
-                  hintText: AppStrings.get('item_notes_hint', lang),
+                  labelText: isAr ? 'ملاحظة خاصة إضافية (اختياري)' : 'Special Request (Optional)',
+                  hintText: isAr ? 'مثال: تقديم بعد العشاء، كاس دبل...' : 'e.g. serve after food...',
                   prefixIcon: const Icon(Icons.edit_note, color: AppTheme.primaryAmber),
                   isDense: true,
                 ),
                 maxLines: 2,
               ),
 
-              const SizedBox(height: 22),
+              const SizedBox(height: 20),
 
               // Quantity Selector
               Row(
@@ -281,7 +297,7 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                   Text(
                     AppStrings.get('quantity', lang),
                     style: const TextStyle(
-                      fontSize: 15,
+                      fontSize: 16,
                       fontWeight: FontWeight.bold,
                       color: AppTheme.textDark,
                     ),
@@ -289,13 +305,13 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                   Container(
                     decoration: BoxDecoration(
                       color: AppTheme.cardLatte,
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppTheme.borderSubtle),
                     ),
                     child: Row(
                       children: [
                         IconButton(
-                          icon: const Icon(Icons.remove, size: 20, color: AppTheme.primaryCoffee),
+                          icon: const Icon(Icons.remove, size: 22, color: AppTheme.primaryCoffee),
                           onPressed: () {
                             if (_quantity > 1) {
                               setState(() => _quantity--);
@@ -303,18 +319,18 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
                           },
                         ),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
                           child: Text(
                             '$_quantity',
                             style: const TextStyle(
-                              fontSize: 16,
+                              fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: AppTheme.textDark,
                             ),
                           ),
                         ),
                         IconButton(
-                          icon: const Icon(Icons.add, size: 20, color: AppTheme.primaryCoffee),
+                          icon: const Icon(Icons.add, size: 22, color: AppTheme.primaryCoffee),
                           onPressed: () {
                             setState(() => _quantity++);
                           },
@@ -330,22 +346,36 @@ class _ItemDetailDialogState extends State<ItemDetailDialog> {
               // Add to Order Button
               SizedBox(
                 width: double.infinity,
-                height: 52,
+                height: 54,
                 child: ElevatedButton.icon(
                   onPressed: () {
-                    final combinedNotes = _getCombinedNotes();
+                    final notesList = <String>[];
+                    if (_selectedAddons.isNotEmpty) {
+                      notesList.add(
+                        _selectedAddons
+                            .map((a) => a.price > 0 ? '${a.getName(lang)} (+${a.price.toStringAsFixed(2)})' : a.getName(lang))
+                            .join(' ، '),
+                      );
+                    }
+                    final custom = _notesController.text.trim();
+                    if (custom.isNotEmpty) {
+                      notesList.add(custom);
+                    }
+                    final combinedNotes = notesList.join(' | ');
+
                     Provider.of<CartProvider>(context, listen: false).addItem(
                       menuItem: widget.item,
                       size: _selectedSize,
                       quantity: _quantity,
                       notes: combinedNotes,
+                      customUnitPrice: unitPrice,
                     );
                     Navigator.pop(context);
                   },
                   icon: const Icon(Icons.add_shopping_cart, color: Colors.white),
                   label: Text(
                     '${AppStrings.get('add_to_order', lang)}  •  ${totalPrice.toStringAsFixed(2)} $currency',
-                    style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    style: const TextStyle(fontSize: 16.5, fontWeight: FontWeight.bold),
                   ),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppTheme.primaryCoffee,

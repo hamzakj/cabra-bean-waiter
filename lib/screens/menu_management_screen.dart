@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/menu_item.dart';
+import '../models/category_item.dart';
 import '../providers/menu_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
+import 'categories_management_screen.dart';
+import 'addons_management_screen.dart';
 
 class MenuManagementScreen extends StatelessWidget {
   const MenuManagementScreen({super.key});
@@ -26,7 +29,12 @@ class MenuManagementScreen extends StatelessWidget {
       text: item?.priceLarge != null ? item!.priceLarge!.toStringAsFixed(2) : '',
     );
 
-    String selectedCategory = item?.category ?? 'hot_coffee';
+    final categories = menuProvider.categories;
+    String selectedCategory = item?.category ?? (categories.isNotEmpty ? categories.first.id : 'hot_coffee');
+    if (categories.isNotEmpty && !categories.any((c) => c.id == selectedCategory)) {
+      selectedCategory = categories.first.id;
+    }
+
     bool hasSmall = item?.hasSmall ?? false;
     bool hasMedium = item?.hasMedium ?? true;
     bool hasLarge = item?.hasLarge ?? false;
@@ -36,6 +44,7 @@ class MenuManagementScreen extends StatelessWidget {
       builder: (ctx) => StatefulBuilder(
         builder: (context, setState) {
           return AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
             title: Text(
               item == null ? AppStrings.get('add_new_item', lang) : AppStrings.get('edit_item', lang),
               style: const TextStyle(fontWeight: FontWeight.bold),
@@ -63,28 +72,23 @@ class MenuManagementScreen extends StatelessWidget {
                     ),
                     const SizedBox(height: 12),
 
-                    // Category Dropdown
+                    // Dynamic Category Dropdown
                     DropdownButtonFormField<String>(
                       value: selectedCategory,
                       decoration: InputDecoration(
                         labelText: AppStrings.get('category', lang),
                         prefixIcon: const Icon(Icons.category_outlined),
                       ),
-                      items: [
-                        'hot_coffee',
-                        'hot_milk',
-                        'other_hot',
-                        'iced_coffee',
-                        'frappe',
-                        'mojito',
-                        'iced_tea',
-                        'milkshake',
-                        'smoothie',
-                        'sweets',
-                      ].map((cat) {
+                      items: categories.map((cat) {
                         return DropdownMenuItem(
-                          value: cat,
-                          child: Text(AppStrings.get('cat_$cat', lang)),
+                          value: cat.id,
+                          child: Row(
+                            children: [
+                              Icon(cat.iconData, size: 18, color: AppTheme.primaryCoffee),
+                              const SizedBox(width: 8),
+                              Text(cat.getName(lang)),
+                            ],
+                          ),
                         );
                       }).toList(),
                       onChanged: (val) {
@@ -218,6 +222,7 @@ class MenuManagementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LocaleProvider>(context).langCode;
+    final isAr = lang == 'ar';
     final menuProvider = Provider.of<MenuProvider>(context);
     final currency = AppStrings.get('currency', lang);
 
@@ -234,13 +239,101 @@ class MenuManagementScreen extends StatelessWidget {
       ),
       body: Column(
         children: [
+          // Quick Shortcuts: Categories & Add-ons
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 14, 14, 4),
+            child: Row(
+              children: [
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const CategoriesManagementScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardLatte,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primaryCoffee.withOpacity(0.3)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryCoffee,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.category_outlined, color: Colors.white, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              isAr ? 'إدارة التصنيفات' : 'Categories',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.primaryCoffee),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: InkWell(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const AddonsManagementScreen()),
+                      );
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.cardLatte,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppTheme.primaryAmber.withOpacity(0.5)),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppTheme.primaryAmber,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Icon(Icons.tune, color: Colors.white, size: 18),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              isAr ? 'إدارة الإضافات' : 'Add-ons & Prices',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                            ),
+                          ),
+                          const Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.primaryCoffee),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // Search Bar
           Padding(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
             child: TextField(
               onChanged: (val) => menuProvider.setSearchQuery(val),
               decoration: InputDecoration(
-                hintText: 'ابحث عن صنف بالاسم...',
+                hintText: isAr ? 'ابحث عن صنف بالاسم...' : 'Search items...',
                 prefixIcon: const Icon(Icons.search, color: AppTheme.primaryAmber),
                 isDense: true,
                 filled: true,
@@ -259,36 +352,41 @@ class MenuManagementScreen extends StatelessWidget {
                     separatorBuilder: (_, __) => const SizedBox(height: 8),
                     itemBuilder: (context, index) {
                       final item = menuProvider.filteredItems[index];
+                      final cat = menuProvider.categories.firstWhere(
+                        (c) => c.id == item.category,
+                        orElse: () => CategoryItem(id: item.category, nameAr: item.category, nameEn: item.category),
+                      );
+
                       return Card(
                         child: ListTile(
                           leading: CircleAvatar(
                             backgroundColor: AppTheme.primaryAmber.withOpacity(0.15),
-                            child: const Icon(Icons.coffee, color: AppTheme.primaryCoffee, size: 20),
+                            child: Icon(cat.iconData, color: AppTheme.primaryCoffee, size: 20),
                           ),
                           title: Text(
                             item.getName(lang),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
                           ),
                           subtitle: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                AppStrings.get('cat_${item.category}', lang),
-                                style: const TextStyle(fontSize: 12, color: AppTheme.primaryAmber),
+                                cat.getName(lang),
+                                style: const TextStyle(fontSize: 12.5, color: AppTheme.primaryAmber, fontWeight: FontWeight.bold),
                               ),
-                              const SizedBox(height: 2),
+                              const SizedBox(height: 3),
                               Wrap(
                                 spacing: 8,
                                 children: [
                                   if (item.hasSmall)
                                     Text('S: ${item.priceSmall!.toStringAsFixed(2)} $currency',
-                                        style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted)),
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                                   if (item.hasMedium)
                                     Text('M: ${item.priceMedium!.toStringAsFixed(2)} $currency',
-                                        style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted)),
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                                   if (item.hasLarge)
                                     Text('L: ${item.priceLarge!.toStringAsFixed(2)} $currency',
-                                        style: const TextStyle(fontSize: 11.5, color: AppTheme.textMuted)),
+                                        style: const TextStyle(fontSize: 12, color: AppTheme.textMuted)),
                                 ],
                               ),
                             ],

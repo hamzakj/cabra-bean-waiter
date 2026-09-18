@@ -1,20 +1,37 @@
 import 'package:flutter/material.dart';
 import '../models/menu_item.dart';
+import '../models/category_item.dart';
 import '../database/db_helper.dart';
 
 class MenuProvider with ChangeNotifier {
   List<MenuItem> _items = [];
+  List<CategoryItem> _categories = [];
   String _selectedCategory = 'all';
   String _searchQuery = '';
   bool _isLoading = false;
 
   List<MenuItem> get items => _items;
+  List<CategoryItem> get categories => _categories;
   String get selectedCategory => _selectedCategory;
   String get searchQuery => _searchQuery;
   bool get isLoading => _isLoading;
 
   MenuProvider() {
-    loadMenuItems();
+    loadData();
+  }
+
+  Future<void> loadData() async {
+    _isLoading = true;
+    notifyListeners();
+    try {
+      _categories = await DBHelper.instance.getAllCategories();
+      _items = await DBHelper.instance.getAllMenuItems();
+    } catch (e) {
+      debugPrint('Error loading menu data: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
   }
 
   Future<void> loadMenuItems() async {
@@ -23,10 +40,20 @@ class MenuProvider with ChangeNotifier {
     try {
       _items = await DBHelper.instance.getAllMenuItems();
     } catch (e) {
-      _items = [];
+      debugPrint('Error: $e');
+    } finally {
+      _isLoading = false;
+      notifyListeners();
     }
-    _isLoading = false;
-    notifyListeners();
+  }
+
+  Future<void> loadCategories() async {
+    try {
+      _categories = await DBHelper.instance.getAllCategories();
+      notifyListeners();
+    } catch (e) {
+      _categories = [];
+    }
   }
 
   void selectCategory(String category) {
@@ -62,5 +89,23 @@ class MenuProvider with ChangeNotifier {
   Future<void> deleteItem(int id) async {
     await DBHelper.instance.deleteMenuItem(id);
     await loadMenuItems();
+  }
+
+  Future<void> addCategory(CategoryItem category) async {
+    await DBHelper.instance.insertCategory(category);
+    await loadCategories();
+  }
+
+  Future<void> updateCategory(CategoryItem category) async {
+    await DBHelper.instance.updateCategory(category);
+    await loadCategories();
+  }
+
+  Future<void> deleteCategory(String id) async {
+    await DBHelper.instance.deleteCategory(id);
+    if (_selectedCategory == id) {
+      _selectedCategory = 'all';
+    }
+    await loadCategories();
   }
 }

@@ -8,6 +8,9 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/backup_service.dart';
 import '../services/wifi_printer_service.dart';
+import 'categories_management_screen.dart';
+import 'addons_management_screen.dart';
+import 'menu_management_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -363,6 +366,100 @@ class _SettingsScreenState extends State<SettingsScreen> {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             ),
                           ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // Menu & Categories & Add-ons Management Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            const Icon(Icons.restaurant_menu_rounded, color: AppTheme.primaryCoffee, size: 24),
+                            const SizedBox(width: 8),
+                            Text(
+                              isAr ? 'إدارة المنيو والتصنيفات والخيارات' : 'Menu & Catalog Management',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          isAr
+                              ? 'إدارة أصناف المنيو، وتعديل التصنيفات وتحديد أسعار الإضافات والصوصات الخاصة بالمشروبات والحلويات.'
+                              : 'Manage menu items, organize categories, and configure add-on pricing.',
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 16),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.cardLatte,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.category_outlined, color: AppTheme.primaryCoffee),
+                          ),
+                          title: Text(isAr ? 'إدارة التصنيفات' : 'Categories Management', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(isAr ? 'إضافة وتعديل أقسام المشروبات والحلويات' : 'Organize coffee & drinks categories'),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const CategoriesManagementScreen()),
+                            );
+                          },
+                        ),
+                        const Divider(height: 12),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.cardLatte,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.tune, color: AppTheme.primaryCoffee),
+                          ),
+                          title: Text(isAr ? 'إدارة الإضافات والأسعار' : 'Add-ons & Modifiers', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(isAr ? 'تحديد أسعار الشوتات، الصوصات، الحليب، والسكر' : 'Configure pricing for extra shots, syrups, and milks'),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const AddonsManagementScreen()),
+                            );
+                          },
+                        ),
+                        const Divider(height: 12),
+                        ListTile(
+                          contentPadding: EdgeInsets.zero,
+                          leading: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: AppTheme.cardLatte,
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(Icons.menu_book_outlined, color: AppTheme.primaryCoffee),
+                          ),
+                          title: Text(isAr ? 'إدارة الأصناف والأسعار' : 'Menu Items & Pricing', style: const TextStyle(fontWeight: FontWeight.bold)),
+                          subtitle: Text(isAr ? 'إضافة وتعديل أسعار الأحجام (S / M / L)' : 'Manage item prices for S, M, L'),
+                          trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (_) => const MenuManagementScreen()),
+                            );
+                          },
                         ),
                       ],
                     ),

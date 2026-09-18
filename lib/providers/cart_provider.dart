@@ -31,12 +31,13 @@ class CartProvider with ChangeNotifier {
     required String size,
     int quantity = 1,
     String notes = '',
+    double? customUnitPrice,
   }) {
-    final unitPrice = menuItem.getPrice(size);
+    final unitPrice = customUnitPrice ?? menuItem.getPrice(size);
 
     // Check if identical item with same size and notes already exists
     final existingIndex = _items.indexWhere(
-      (i) => i.menuItemId == menuItem.id && i.size == size && i.notes == notes,
+      (i) => i.menuItemId == menuItem.id && i.size == size && i.notes == notes && (i.unitPrice - unitPrice).abs() < 0.01,
     );
 
     if (existingIndex != -1) {

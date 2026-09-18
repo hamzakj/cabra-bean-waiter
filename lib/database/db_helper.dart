@@ -4,6 +4,8 @@ import 'package:path/path.dart';
 import '../models/menu_item.dart';
 import '../models/table_info.dart';
 import '../models/order.dart';
+import '../models/category_item.dart';
+import '../models/addon_item.dart';
 
 class DBHelper {
   static final DBHelper instance = DBHelper._init();
@@ -14,6 +16,8 @@ class DBHelper {
   final List<MenuItem> _webMenuItems = [];
   final List<TableInfo> _webTables = [];
   final List<Order> _webOrders = [];
+  final List<CategoryItem> _webCategories = [];
+  final List<AddonItem> _webAddons = [];
   final Map<String, String> _webSettings = {
     'cashier_phone': '962791046258',
     'waiter_name': 'أحمد (النادل)',
@@ -21,12 +25,61 @@ class DBHelper {
     'cafe_name': 'Cabra Bean - كابرا بين',
   };
 
+  bool _tablesEnsured = false;
+
   DBHelper._init();
 
   Future<Database> get database async {
-    if (_database != null) return _database!;
+    if (_database != null) {
+      if (!_tablesEnsured) {
+        _tablesEnsured = true;
+        await _ensureNewTables(_database!);
+      }
+      return _database!;
+    }
     _database = await _initDB('cabra_waiter.db');
+    if (!_tablesEnsured) {
+      _tablesEnsured = true;
+      await _ensureNewTables(_database!);
+    }
     return _database!;
+  }
+
+  Future<void> _ensureNewTables(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS categories (
+        id TEXT PRIMARY KEY,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT 'coffee',
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS addons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        price REAL NOT NULL DEFAULT 0.0,
+        category TEXT NOT NULL DEFAULT 'all',
+        is_available INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
+    final catCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM categories')) ?? 0;
+    if (catCount == 0) {
+      for (var cat in _getInitialCategories()) {
+        await db.insert('categories', cat.toMap());
+      }
+    }
+
+    final addonCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM addons')) ?? 0;
+    if (addonCount == 0) {
+      for (var addon in _getInitialAddons()) {
+        await db.insert('addons', addon.toMap());
+      }
+    }
   }
 
   Future<Database> _initDB(String filePath) async {
@@ -119,6 +172,14 @@ class DBHelper {
     for (var item in _getInitialItems()) {
       await db.insert('menu_items', item);
     }
+
+    for (var cat in _getInitialCategories()) {
+      await db.insert('categories', cat.toMap());
+    }
+
+    for (var addon in _getInitialAddons()) {
+      await db.insert('addons', addon.toMap());
+    }
   }
 
   void _initWebStore() {
@@ -148,6 +209,15 @@ class DBHelper {
         isOccupied: false,
       ));
     }
+
+    if (_webCategories.isEmpty) {
+      _webCategories.addAll(_getInitialCategories());
+    }
+
+    if (_webAddons.isEmpty) {
+      _webAddons.addAll(_getInitialAddons());
+    }
+
     _webInitialized = true;
   }
 
@@ -175,7 +245,7 @@ class DBHelper {
     return [
       // --- Black-Coffee (قهوة ساخنة سوداء) ---
       {
-        'name_ar': 'اسبريسو مكياتو',
+        'name_ar': 'اسبريسو ماكياتو',
         'name_en': 'Macchiato',
         'category': 'hot_coffee',
         'price_small': 1.25,
@@ -782,6 +852,151 @@ class DBHelper {
     ];
   }
 
+  static List<CategoryItem> _getInitialCategories() {
+    return [
+      CategoryItem(id: 'hot_coffee', nameAr: 'قهوة ساخنة', nameEn: 'Hot Coffee', iconName: 'coffee', sortOrder: 1),
+      CategoryItem(id: 'hot_milk', nameAr: 'قهوة بالحليب', nameEn: 'Coffee with Milk', iconName: 'local_cafe', sortOrder: 2),
+      CategoryItem(id: 'other_hot', nameAr: 'مشروبات ساخنة', nameEn: 'Hot Drinks', iconName: 'emoji_food_beverage', sortOrder: 3),
+      CategoryItem(id: 'iced_coffee', nameAr: 'قهوة باردة', nameEn: 'Iced Coffee', iconName: 'ac_unit', sortOrder: 4),
+      CategoryItem(id: 'frappe', nameAr: 'فرابيه', nameEn: 'Frappe', iconName: 'blender', sortOrder: 5),
+      CategoryItem(id: 'mojito', nameAr: 'موهيتو', nameEn: 'Mojito', iconName: 'local_bar', sortOrder: 6),
+      CategoryItem(id: 'iced_tea', nameAr: 'شاي مثلج', nameEn: 'Iced Tea', iconName: 'wine_bar', sortOrder: 7),
+      CategoryItem(id: 'milkshake', nameAr: 'ميلك شيك', nameEn: 'Milkshake', iconName: 'icecream', sortOrder: 8),
+      CategoryItem(id: 'smoothie', nameAr: 'سموذي', nameEn: 'Smoothie', iconName: 'water_drop', sortOrder: 9),
+      CategoryItem(id: 'sweets', nameAr: 'حلويات وكريب', nameEn: 'Sweets & Crepe', iconName: 'cake', sortOrder: 10),
+    ];
+  }
+
+  static List<AddonItem> _getInitialAddons() {
+    return [
+      AddonItem(nameAr: 'شوت اسبريسو إضافي', nameEn: 'Extra Espresso Shot', price: 0.50, category: 'all'),
+      AddonItem(nameAr: 'حليب شوفان أو لوز', nameEn: 'Oat or Almond Milk', price: 0.50, category: 'all'),
+      AddonItem(nameAr: 'صوص كراميل', nameEn: 'Caramel Syrup', price: 0.25, category: 'all'),
+      AddonItem(nameAr: 'صوص فانيلا', nameEn: 'Vanilla Syrup', price: 0.25, category: 'all'),
+      AddonItem(nameAr: 'صوص بندق (هازلتوت)', nameEn: 'Hazelnut Syrup', price: 0.25, category: 'all'),
+      AddonItem(nameAr: 'كريمة مخفوقة', nameEn: 'Whipped Cream', price: 0.35, category: 'all'),
+      AddonItem(nameAr: 'شوكولاتة / نوتيلا إضافية', nameEn: 'Extra Nutella / Choco', price: 0.50, category: 'all'),
+      AddonItem(nameAr: 'سكر زيادة', nameEn: 'Extra Sugar', price: 0.00, category: 'all'),
+      AddonItem(nameAr: 'سكر خفيف', nameEn: 'Light Sugar', price: 0.00, category: 'all'),
+      AddonItem(nameAr: 'بدون سكر', nameEn: 'No Sugar', price: 0.00, category: 'all'),
+      AddonItem(nameAr: 'ثلج زيادة', nameEn: 'Extra Ice', price: 0.00, category: 'all'),
+      AddonItem(nameAr: 'بدون ثلج', nameEn: 'No Ice', price: 0.00, category: 'all'),
+    ];
+  }
+
+  // --- CRUD Categories ---
+  Future<List<CategoryItem>> getAllCategories() async {
+    if (kIsWeb) {
+      _initWebStore();
+      return List.unmodifiable(_webCategories);
+    }
+    final db = await database;
+    final maps = await db.query('categories', orderBy: 'sort_order ASC, id ASC');
+    if (maps.isEmpty) {
+      for (var cat in _getInitialCategories()) {
+        await db.insert('categories', cat.toMap());
+      }
+      final newMaps = await db.query('categories', orderBy: 'sort_order ASC, id ASC');
+      return newMaps.map((m) => CategoryItem.fromMap(m)).toList();
+    }
+    return maps.map((m) => CategoryItem.fromMap(m)).toList();
+  }
+
+  Future<void> insertCategory(CategoryItem category) async {
+    if (kIsWeb) {
+      _initWebStore();
+      _webCategories.add(category);
+      return;
+    }
+    final db = await database;
+    await db.insert(
+      'categories',
+      category.toMap(),
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<void> updateCategory(CategoryItem category) async {
+    if (kIsWeb) {
+      _initWebStore();
+      final idx = _webCategories.indexWhere((c) => c.id == category.id);
+      if (idx != -1) _webCategories[idx] = category;
+      return;
+    }
+    final db = await database;
+    await db.update(
+      'categories',
+      category.toMap(),
+      where: 'id = ?',
+      whereArgs: [category.id],
+    );
+  }
+
+  Future<void> deleteCategory(String id) async {
+    if (kIsWeb) {
+      _initWebStore();
+      _webCategories.removeWhere((c) => c.id == id);
+      return;
+    }
+    final db = await database;
+    await db.delete('categories', where: 'id = ?', whereArgs: [id]);
+  }
+
+  // --- CRUD Addons ---
+  Future<List<AddonItem>> getAllAddons() async {
+    if (kIsWeb) {
+      _initWebStore();
+      return List.unmodifiable(_webAddons);
+    }
+    final db = await database;
+    final maps = await db.query('addons', orderBy: 'id ASC');
+    if (maps.isEmpty) {
+      for (var addon in _getInitialAddons()) {
+        await db.insert('addons', addon.toMap());
+      }
+      final newMaps = await db.query('addons', orderBy: 'id ASC');
+      return newMaps.map((m) => AddonItem.fromMap(m)).toList();
+    }
+    return maps.map((m) => AddonItem.fromMap(m)).toList();
+  }
+
+  Future<int> insertAddon(AddonItem addon) async {
+    if (kIsWeb) {
+      _initWebStore();
+      final newId = _webAddons.length + 1;
+      _webAddons.add(addon.copyWith(id: newId));
+      return newId;
+    }
+    final db = await database;
+    return await db.insert('addons', addon.toMap());
+  }
+
+  Future<int> updateAddon(AddonItem addon) async {
+    if (kIsWeb) {
+      _initWebStore();
+      final idx = _webAddons.indexWhere((a) => a.id == addon.id);
+      if (idx != -1) _webAddons[idx] = addon;
+      return 1;
+    }
+    final db = await database;
+    return await db.update(
+      'addons',
+      addon.toMap(),
+      where: 'id = ?',
+      whereArgs: [addon.id],
+    );
+  }
+
+  Future<int> deleteAddon(int id) async {
+    if (kIsWeb) {
+      _initWebStore();
+      _webAddons.removeWhere((a) => a.id == id);
+      return 1;
+    }
+    final db = await database;
+    return await db.delete('addons', where: 'id = ?', whereArgs: [id]);
+  }
+
   // --- CRUD Menu Items ---
   Future<List<MenuItem>> getAllMenuItems() async {
     if (kIsWeb) {
@@ -1033,11 +1248,13 @@ class DBHelper {
     if (kIsWeb) {
       _initWebStore();
       return {
-        'version': 1,
+        'version': 2,
         'exported_at': DateTime.now().toIso8601String(),
         'cafe': 'Cabra Bean',
         'menu_items': _webMenuItems.map((m) => m.toMap()).toList(),
         'tables': _webTables.map((t) => t.toMap()).toList(),
+        'categories': _webCategories.map((c) => c.toMap()).toList(),
+        'addons': _webAddons.map((a) => a.toMap()).toList(),
         'settings': _webSettings.entries.map((e) => {'key': e.key, 'value': e.value}).toList(),
         'orders': _webOrders.map((o) => o.toJson()).toList(),
       };
@@ -1045,15 +1262,19 @@ class DBHelper {
     final db = await database;
     final menuItems = await db.query('menu_items');
     final tables = await db.query('tables');
+    final categories = await db.query('categories');
+    final addons = await db.query('addons');
     final settings = await db.query('settings');
     final orders = await getAllOrders();
 
     return {
-      'version': 1,
+      'version': 2,
       'exported_at': DateTime.now().toIso8601String(),
       'cafe': 'Cabra Bean',
       'menu_items': menuItems,
       'tables': tables,
+      'categories': categories,
+      'addons': addons,
       'settings': settings,
       'orders': orders.map((o) => o.toJson()).toList(),
     };
@@ -1080,6 +1301,19 @@ class DBHelper {
           int t = 1;
           for (var tbl in data['tables']) {
             _webTables.add(TableInfo.fromMap(Map<String, dynamic>.from(tbl)).copyWith(id: t++));
+          }
+        }
+        if (data['categories'] != null) {
+          _webCategories.clear();
+          for (var cat in data['categories']) {
+            _webCategories.add(CategoryItem.fromMap(Map<String, dynamic>.from(cat)));
+          }
+        }
+        if (data['addons'] != null) {
+          _webAddons.clear();
+          int a = 1;
+          for (var addon in data['addons']) {
+            _webAddons.add(AddonItem.fromMap(Map<String, dynamic>.from(addon)).copyWith(id: a++));
           }
         }
         return true;
@@ -1115,6 +1349,23 @@ class DBHelper {
             final map = Map<String, dynamic>.from(t);
             map.remove('id');
             await txn.insert('tables', map);
+          }
+        }
+
+        if (data['categories'] != null) {
+          await txn.delete('categories');
+          for (var cat in data['categories']) {
+            final map = Map<String, dynamic>.from(cat);
+            await txn.insert('categories', map, conflictAlgorithm: ConflictAlgorithm.replace);
+          }
+        }
+
+        if (data['addons'] != null) {
+          await txn.delete('addons');
+          for (var addon in data['addons']) {
+            final map = Map<String, dynamic>.from(addon);
+            map.remove('id');
+            await txn.insert('addons', map);
           }
         }
       });

@@ -8,6 +8,7 @@ import 'providers/menu_provider.dart';
 import 'providers/tables_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/orders_provider.dart';
+import 'providers/addons_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 
@@ -23,6 +24,7 @@ void main() async {
         ChangeNotifierProvider(create: (_) => TablesProvider()),
         ChangeNotifierProvider(create: (_) => CartProvider()),
         ChangeNotifierProvider(create: (_) => OrdersProvider()),
+        ChangeNotifierProvider(create: (_) => AddonsProvider()),
       ],
       child: const CabraWaiterApp(),
     ),
