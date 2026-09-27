@@ -8,6 +8,8 @@ class SettingsProvider with ChangeNotifier {
   String _printerIp = '192.168.1.134';
   int _printerPort = 9100;
   bool _autoPrintBill = false;
+  String _telegramBotToken = '';
+  String _telegramChatId = '';
 
   String get cashierPhone => _cashierPhone;
   String get waiterName => _waiterName;
@@ -15,6 +17,8 @@ class SettingsProvider with ChangeNotifier {
   String get printerIp => _printerIp;
   int get printerPort => _printerPort;
   bool get autoPrintBill => _autoPrintBill;
+  String get telegramBotToken => _telegramBotToken;
+  String get telegramChatId => _telegramChatId;
 
   SettingsProvider() {
     loadSettings();
@@ -29,6 +33,8 @@ class SettingsProvider with ChangeNotifier {
     _printerPort = int.tryParse(portStr) ?? 9100;
     final autoPrintStr = await DBHelper.instance.getSetting('auto_print_bill', defaultValue: '0');
     _autoPrintBill = autoPrintStr == '1';
+    _telegramBotToken = await DBHelper.instance.getSetting('telegram_bot_token', defaultValue: '');
+    _telegramChatId = await DBHelper.instance.getSetting('telegram_chat_id', defaultValue: '');
     notifyListeners();
   }
 
@@ -59,6 +65,18 @@ class SettingsProvider with ChangeNotifier {
   Future<void> setAutoPrintBill(bool value) async {
     _autoPrintBill = value;
     await DBHelper.instance.setSetting('auto_print_bill', value ? '1' : '0');
+    notifyListeners();
+  }
+
+  Future<void> setTelegramBotToken(String token) async {
+    _telegramBotToken = token.trim();
+    await DBHelper.instance.setSetting('telegram_bot_token', _telegramBotToken);
+    notifyListeners();
+  }
+
+  Future<void> setTelegramChatId(String chatId) async {
+    _telegramChatId = chatId.trim();
+    await DBHelper.instance.setSetting('telegram_chat_id', _telegramChatId);
     notifyListeners();
   }
 }

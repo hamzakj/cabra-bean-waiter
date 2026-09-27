@@ -10,6 +10,7 @@ import '../providers/settings_provider.dart';
 import '../providers/locale_provider.dart';
 import '../services/wifi_printer_service.dart';
 import '../services/whatsapp_service.dart';
+import '../services/telegram_service.dart';
 import '../theme/app_theme.dart';
 import '../l10n/app_strings.dart';
 
@@ -318,10 +319,56 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Action Button 2: WhatsApp to Cashier
+                      // Action Button 2: Telegram Final Bill to Cashier
                       SizedBox(
                         width: double.infinity,
                         height: 46,
+                        child: ElevatedButton.icon(
+                          onPressed: () async {
+                            if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                const SnackBar(
+                                  content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                                  backgroundColor: AppTheme.statusOrange,
+                                ),
+                              );
+                              return;
+                            }
+                            final res = await TelegramService.sendFinalBill(
+                              botToken: settings.telegramBotToken,
+                              chatId: settings.telegramChatId,
+                              order: activeOrder,
+                              lang: lang,
+                            );
+                            if (ctx.mounted) {
+                              ScaffoldMessenger.of(ctx).showSnackBar(
+                                SnackBar(
+                                  content: Text(res.message),
+                                  backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                                  duration: const Duration(seconds: 4),
+                                ),
+                              );
+                            }
+                          },
+                          icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
+                          label: Text(
+                            isAr ? 'إرسال الفاتورة للمحاسبة (تليجرام) 🧾' : 'Send Final Bill to Cashier (Telegram) 🧾',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF0088CC),
+                            foregroundColor: Colors.white,
+                            elevation: 2,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+
+                      // Action Button 3: WhatsApp to Cashier (Backup)
+                      SizedBox(
+                        width: double.infinity,
+                        height: 44,
                         child: OutlinedButton.icon(
                           onPressed: () {
                             WhatsAppService.sendFinalBillToCashier(
@@ -330,10 +377,10 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                               lang: lang,
                             );
                           },
-                          icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 20),
+                          icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
                           label: Text(
-                            isAr ? 'إرسال الفاتورة للكاشير (واتساب) 💬' : 'Send Bill to Cashier (WhatsApp) 💬',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: Color(0xFF25D366)),
+                            isAr ? 'إرسال الفاتورة عبر واتساب (احتياطي) 💬' : 'Send Bill via WhatsApp (Backup) 💬',
+                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
                           ),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF25D366), width: 1.5),

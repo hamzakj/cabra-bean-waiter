@@ -8,6 +8,7 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/backup_service.dart';
 import '../services/wifi_printer_service.dart';
+import '../services/telegram_service.dart';
 import 'categories_management_screen.dart';
 import 'addons_management_screen.dart';
 import 'menu_management_screen.dart';
@@ -25,9 +26,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final TextEditingController _waiterController = TextEditingController();
   final TextEditingController _printerIpController = TextEditingController();
   final TextEditingController _printerPortController = TextEditingController();
+  final TextEditingController _telegramTokenController = TextEditingController();
+  final TextEditingController _telegramChatIdController = TextEditingController();
   bool _isExporting = false;
   bool _isImporting = false;
   bool _isTestingPrinter = false;
+  bool _isTestingTelegram = false;
 
   @override
   void initState() {
@@ -37,6 +41,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _waiterController.text = settings.waiterName;
     _printerIpController.text = settings.printerIp;
     _printerPortController.text = settings.printerPort.toString();
+    _telegramTokenController.text = settings.telegramBotToken;
+    _telegramChatIdController.text = settings.telegramChatId;
   }
 
   @override
@@ -45,6 +51,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _waiterController.dispose();
     _printerIpController.dispose();
     _printerPortController.dispose();
+    _telegramTokenController.dispose();
+    _telegramChatIdController.dispose();
     super.dispose();
   }
 
@@ -121,6 +129,41 @@ class _SettingsScreenState extends State<SettingsScreen> {
           content: Text(result.message),
           backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
           duration: const Duration(seconds: 4),
+        ),
+      );
+    }
+  }
+
+  Future<void> _handleTestTelegram(BuildContext context, SettingsProvider settings) async {
+    final token = _telegramTokenController.text.trim();
+    final chatId = _telegramChatIdController.text.trim();
+    await settings.setTelegramBotToken(token);
+    await settings.setTelegramChatId(chatId);
+
+    if (token.isEmpty || chatId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('يرجى كتابة Bot Token و Chat ID أولاً'),
+          backgroundColor: AppTheme.statusOrange,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isTestingTelegram = true);
+    final result = await TelegramService.sendTestMessage(
+      botToken: token,
+      chatId: chatId,
+      cafeName: settings.cafeName,
+    );
+    setState(() => _isTestingTelegram = false);
+
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(result.message),
+          backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
+          duration: const Duration(seconds: 5),
         ),
       );
     }
@@ -251,6 +294,101 @@ class _SettingsScreenState extends State<SettingsScreen> {
                                   const SnackBar(content: Text('تم حفظ اسم الويتر بنجاح')),
                                 );
                               },
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 18),
+
+                // Telegram Bot Settings Card
+                Card(
+                  child: Padding(
+                    padding: const EdgeInsets.all(18),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: const [
+                            Icon(Icons.send_rounded, color: Color(0xFF0088CC), size: 24),
+                            SizedBox(width: 8),
+                            Text(
+                              'بوت تليجرام (Telegram Bot)',
+                              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'إرسال طلبات تحضير المطبخ والبار، والفواتير النهائية للمحاسبة مباشرة عبر بوت تليجرام.',
+                          style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
+                        ),
+                        const SizedBox(height: 16),
+
+                        // Bot Token
+                        TextField(
+                          controller: _telegramTokenController,
+                          decoration: InputDecoration(
+                            labelText: 'رمز البوت (Bot Token)',
+                            hintText: '123456789:ABCdefGhIJKlmNoPQRsTUVwxyZ',
+                            prefixIcon: const Icon(Icons.key, color: Color(0xFF0088CC)),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.check_circle, color: AppTheme.statusGreen),
+                              tooltip: 'حفظ Token',
+                              onPressed: () {
+                                settings.setTelegramBotToken(_telegramTokenController.text);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم حفظ Bot Token بنجاح')),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Chat ID
+                        TextField(
+                          controller: _telegramChatIdController,
+                          decoration: InputDecoration(
+                            labelText: 'معرف المحادثة أو القناة (Chat ID)',
+                            hintText: '-100xxxxxxxxxx أو 12345678',
+                            prefixIcon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF0088CC)),
+                            suffixIcon: IconButton(
+                              icon: const Icon(Icons.check_circle, color: AppTheme.statusGreen),
+                              tooltip: 'حفظ Chat ID',
+                              onPressed: () {
+                                settings.setTelegramChatId(_telegramChatIdController.text);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  const SnackBar(content: Text('تم حفظ Chat ID بنجاح')),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+
+                        const SizedBox(height: 14),
+
+                        // Test Telegram Button
+                        SizedBox(
+                          width: double.infinity,
+                          height: 44,
+                          child: ElevatedButton.icon(
+                            onPressed: _isTestingTelegram ? null : () => _handleTestTelegram(context, settings),
+                            icon: _isTestingTelegram
+                                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                                : const Icon(Icons.send, color: Colors.white, size: 18),
+                            label: Text(
+                              _isTestingTelegram ? 'جاري إرسال الرسالة التجريبية...' : 'إرسال رسالة تجريبية للبوت 🚀',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0088CC),
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
                         ),

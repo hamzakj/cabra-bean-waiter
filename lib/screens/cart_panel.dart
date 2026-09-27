@@ -10,6 +10,7 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/whatsapp_service.dart';
 import '../services/wifi_printer_service.dart';
+import '../services/telegram_service.dart';
 
 class CartPanel extends StatefulWidget {
   final bool isBottomSheet;
@@ -146,15 +147,29 @@ class _CartPanelState extends State<CartPanel> {
       // Refresh tables to reflect occupancy
       await tablesProvider.loadTables();
 
-      // Launch WhatsApp with merge/addition flags
-      await WhatsAppService.sendOrderToCashier(
-        cashierPhone: settings.cashierPhone,
-        order: order,
-        lang: lang,
-        isAddition: isMerged,
-        addedItemsOnly: isMerged ? result.addedItems : null,
-        previousTotal: isMerged ? result.previousTotal : null,
-      );
+      // Send Preparation Order via Telegram Bot if configured
+      TelegramResult? telegramResult;
+      if (settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
+        telegramResult = await TelegramService.sendPreparationOrder(
+          botToken: settings.telegramBotToken,
+          chatId: settings.telegramChatId,
+          order: order,
+          lang: lang,
+          isAddition: isMerged,
+          addedItemsOnly: isMerged ? result.addedItems : null,
+          previousTotal: isMerged ? result.previousTotal : null,
+        );
+      } else {
+        // Fallback to WhatsApp if Telegram is not configured yet
+        await WhatsAppService.sendOrderToCashier(
+          cashierPhone: settings.cashierPhone,
+          order: order,
+          lang: lang,
+          isAddition: isMerged,
+          addedItemsOnly: isMerged ? result.addedItems : null,
+          previousTotal: isMerged ? result.previousTotal : null,
+        );
+      }
 
       // Auto-print bill via Wi-Fi if enabled in settings
       if (settings.autoPrintBill) {
@@ -182,7 +197,7 @@ class _CartPanelState extends State<CartPanel> {
           Navigator.pop(context);
         }
 
-        // Show Success & Instant Direct WhatsApp Launcher Dialog
+        // Show Success & Instant Dispatch Dialog
         showDialog(
           context: context,
           barrierDismissible: false,
@@ -190,15 +205,15 @@ class _CartPanelState extends State<CartPanel> {
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
             title: Row(
               children: [
-                Icon(
-                  isMerged ? Icons.add_circle : Icons.check_circle,
-                  color: isMerged ? AppTheme.primaryAmber : const Color(0xFF25D366),
+                const Icon(
+                  Icons.restaurant_menu_rounded,
+                  color: Color(0xFF0088CC),
                   size: 28,
                 ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    isMerged ? 'تم دمج الطلب مع الفاتورة الحالية!' : 'تم تسجيل الطلب بنجاح!',
+                    isMerged ? 'تم إرسال طلب التحضير الإضافي! 🍳' : 'تم إرسال طلب التحضير للمطبخ! 🍳☕',
                     style: const TextStyle(fontSize: 16),
                   ),
                 ),
@@ -227,7 +242,7 @@ class _CartPanelState extends State<CartPanel> {
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    'تم دمج الأصناف الجديدة مع الطلب الأصلي تلقائياً وإشعار الكاشير.',
+                    'تم دمج الأصناف الجديدة مع الطلب الأصلي وإرسال إشعار تحضير جديد للمطبخ.',
                     style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                   ),
                 ] else ...[
@@ -236,16 +251,110 @@ class _CartPanelState extends State<CartPanel> {
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.primaryCoffee),
                   ),
                 ],
+                const SizedBox(height: 12),
+
+                // Telegram Status Banner
+                if (telegramResult != null)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: telegramResult.success ? const Color(0xFFE8F4FD) : const Color(0xFFFFF3CD),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(
+                        color: telegramResult.success ? const Color(0xFF0088CC).withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          telegramResult.success ? Icons.check_circle : Icons.warning_amber_rounded,
+                          color: telegramResult.success ? const Color(0xFF0088CC) : Colors.orange,
+                          size: 20,
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            telegramResult.message,
+                            style: TextStyle(
+                              fontSize: 12.5,
+                              fontWeight: FontWeight.w600,
+                              color: telegramResult.success ? const Color(0xFF0088CC) : Colors.brown,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (settings.telegramBotToken.isEmpty)
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3CD),
+                      borderRadius: BorderRadius.circular(10),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'ℹ️ تم إرسال الطلب عبر واتساب. لربط الإرسال الفوري عبر تليجرام، أدخل Bot Token في الإعدادات.',
+                      style: TextStyle(fontSize: 12, color: Colors.brown),
+                    ),
+                  ),
+
                 const SizedBox(height: 14),
-                const Text(
-                  'إذا لم يفتح الواتساب تلقائياً، اضغط الزر الأخضر بالأسفل مباشرة:',
-                  style: TextStyle(fontSize: 12.5, color: AppTheme.textDark),
-                ),
-                const SizedBox(height: 14),
+
+                // Button 1: Re-send via Telegram
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 46,
                   child: ElevatedButton.icon(
+                    onPressed: () async {
+                      if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          const SnackBar(
+                            content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                            backgroundColor: AppTheme.statusOrange,
+                          ),
+                        );
+                        return;
+                      }
+                      final res = await TelegramService.sendPreparationOrder(
+                        botToken: settings.telegramBotToken,
+                        chatId: settings.telegramChatId,
+                        order: order,
+                        lang: lang,
+                        isAddition: isMerged,
+                        addedItemsOnly: isMerged ? result.addedItems : null,
+                        previousTotal: isMerged ? result.previousTotal : null,
+                      );
+                      if (ctx.mounted) {
+                        ScaffoldMessenger.of(ctx).showSnackBar(
+                          SnackBar(
+                            content: Text(res.message),
+                            backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                    label: const Text(
+                      'إرسال طلب التحضير (تليجرام) 🚀',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF0088CC),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Button 2: WhatsApp (Backup)
+                SizedBox(
+                  width: double.infinity,
+                  height: 44,
+                  child: OutlinedButton.icon(
                     onPressed: () {
                       WhatsAppService.sendOrderToCashier(
                         cashierPhone: settings.cashierPhone,
@@ -256,22 +365,23 @@ class _CartPanelState extends State<CartPanel> {
                         previousTotal: isMerged ? result.previousTotal : null,
                       );
                     },
-                    icon: const Icon(Icons.open_in_new, color: Colors.white, size: 20),
-                    label: Text(
-                      isMerged ? 'إرسال الإضافة للواتساب 💬' : 'فتح الواتساب الآن 💬',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
+                    label: const Text(
+                      'إرسال عبر واتساب (احتياطي) 💬',
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
                     ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF25D366),
-                      foregroundColor: Colors.white,
-                      elevation: 2,
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
                 ),
-                const SizedBox(height: 10),
+                const SizedBox(height: 8),
+
+                // Button 3: Wi-Fi Print
                 SizedBox(
                   width: double.infinity,
-                  height: 48,
+                  height: 44,
                   child: OutlinedButton.icon(
                     onPressed: () async {
                       final printRes = await WifiPrinterService.printTableBill(
@@ -297,10 +407,10 @@ class _CartPanelState extends State<CartPanel> {
                         );
                       }
                     },
-                    icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 20),
+                    icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 18),
                     label: const Text(
                       'طباعة الفاتورة (Wi-Fi) 🖨️',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee),
                     ),
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
@@ -813,7 +923,7 @@ class _CartPanelState extends State<CartPanel> {
                   child: ElevatedButton(
                     onPressed: _isSubmitting ? null : () => _handleSendOrder(context),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: isTableOccupied ? AppTheme.primaryCoffee : const Color(0xFF25D366),
+                      backgroundColor: isTableOccupied ? AppTheme.primaryCoffee : const Color(0xFF0088CC),
                       foregroundColor: Colors.white,
                       elevation: 3,
                       shape: RoundedRectangleBorder(
@@ -830,15 +940,15 @@ class _CartPanelState extends State<CartPanel> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                isTableOccupied ? Icons.merge_type_rounded : Icons.send_rounded,
+                                isTableOccupied ? Icons.merge_type_rounded : Icons.restaurant_menu_rounded,
                                 color: Colors.white,
                                 size: 20,
                               ),
                               const SizedBox(width: 8),
                               Text(
                                 isTableOccupied
-                                    ? (isAr ? 'دمج وإرسال للكاشير (واتساب)' : 'Merge & Send (WhatsApp)')
-                                    : AppStrings.get('send_to_cashier', lang),
+                                    ? (isAr ? 'دمج وإرسال طلب التحضير 🚀' : 'Merge & Send Prep Order 🚀')
+                                    : (isAr ? 'إرسال طلب التحضير (تليجرام) 🚀' : 'Send Prep Order (Telegram) 🚀'),
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                               ),
                             ],

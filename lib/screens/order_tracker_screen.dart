@@ -9,6 +9,7 @@ import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
 import '../services/whatsapp_service.dart';
 import '../services/wifi_printer_service.dart';
+import '../services/telegram_service.dart';
 
 class OrderTrackerScreen extends StatelessWidget {
   final bool isEmbedded;
@@ -48,14 +49,16 @@ class OrderTrackerScreen extends StatelessWidget {
     }
   }
 
-  void _showFinalBillDialog(BuildContext context, Order order, String cashierPhone, String lang) {
+  void _showFinalBillDialog(BuildContext context, Order order, String cashierPhone, String lang, {TelegramResult? telegramResult}) {
+    final settings = Provider.of<SettingsProvider>(context, listen: false);
+
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
           children: const [
-            Icon(Icons.receipt_long, color: AppTheme.primaryAmber, size: 28),
+            Icon(Icons.receipt_long, color: Color(0xFF0088CC), size: 28),
             SizedBox(width: 8),
             Text('الفاتورة النهائية للمحاسبة'),
           ],
@@ -87,16 +90,95 @@ class OrderTrackerScreen extends StatelessWidget {
                 ],
               ),
             ),
-            const SizedBox(height: 14),
+            const SizedBox(height: 12),
+
+            // Telegram status banner if available
+            if (telegramResult != null)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: telegramResult.success ? const Color(0xFFE8F4FD) : const Color(0xFFFFF3CD),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: telegramResult.success ? const Color(0xFF0088CC).withOpacity(0.3) : Colors.orange.withOpacity(0.3),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      telegramResult.success ? Icons.check_circle : Icons.warning_amber_rounded,
+                      color: telegramResult.success ? const Color(0xFF0088CC) : Colors.orange,
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        telegramResult.message,
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                          color: telegramResult.success ? const Color(0xFF0088CC) : Colors.brown,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            const SizedBox(height: 12),
             const Text(
-              'تم إرسال الفاتورة النهائية للكاشير عبر الواتساب. هل ترغب أيضاً بإغلاق الطاولة واعتبارها مدفوعة؟',
+              'هل ترغب بإرسال الفاتورة النهائية للمحاسبة وإغلاق الطاولة؟',
               style: TextStyle(fontSize: 13),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
+
+            // Button 1: Send via Telegram
             SizedBox(
               width: double.infinity,
-              height: 48,
+              height: 46,
               child: ElevatedButton.icon(
+                onPressed: () async {
+                  if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      const SnackBar(
+                        content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                        backgroundColor: AppTheme.statusOrange,
+                      ),
+                    );
+                    return;
+                  }
+                  final res = await TelegramService.sendFinalBill(
+                    botToken: settings.telegramBotToken,
+                    chatId: settings.telegramChatId,
+                    order: order,
+                    lang: lang,
+                  );
+                  if (ctx.mounted) {
+                    ScaffoldMessenger.of(ctx).showSnackBar(
+                      SnackBar(
+                        content: Text(res.message),
+                        backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                label: const Text('إرسال الفاتورة للمحاسبة (تليجرام) 🧾', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF0088CC),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+
+            // Button 2: Send via WhatsApp (Backup)
+            SizedBox(
+              width: double.infinity,
+              height: 42,
+              child: OutlinedButton.icon(
                 onPressed: () {
                   WhatsAppService.sendFinalBillToCashier(
                     cashierPhone: cashierPhone,
@@ -104,9 +186,12 @@ class OrderTrackerScreen extends StatelessWidget {
                     lang: lang,
                   );
                 },
-                icon: const Icon(Icons.open_in_new, color: Colors.white, size: 18),
-                label: const Text('فتح الواتساب مجدداً 💬', style: TextStyle(fontWeight: FontWeight.bold)),
-                style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF25D366), foregroundColor: Colors.white),
+                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
+                label: const Text('إرسال عبر واتساب (احتياطي) 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366))),
+                style: OutlinedButton.styleFrom(
+                  side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
               ),
             ),
           ],
@@ -127,8 +212,8 @@ class OrderTrackerScreen extends StatelessWidget {
                 ),
               );
             },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryCoffee),
-            child: const Text('إغلاق ومحاسبة الطاولة'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryCoffee, foregroundColor: Colors.white),
+            child: const Text('إغلاق ومحاسبة الطاولة ✓'),
           ),
         ],
       ),
@@ -445,25 +530,42 @@ class OrderTrackerScreen extends StatelessWidget {
                                         if (isActive)
                                             ElevatedButton.icon(
                                               onPressed: () async {
-                                                await WhatsAppService.sendFinalBillToCashier(
-                                                  cashierPhone: settings.cashierPhone,
-                                                  order: order,
-                                                  lang: lang,
-                                                );
+                                                TelegramResult? tgRes;
+                                                if (settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
+                                                  tgRes = await TelegramService.sendFinalBill(
+                                                    botToken: settings.telegramBotToken,
+                                                    chatId: settings.telegramChatId,
+                                                    order: order,
+                                                    lang: lang,
+                                                  );
+                                                } else {
+                                                  await WhatsAppService.sendFinalBillToCashier(
+                                                    cashierPhone: settings.cashierPhone,
+                                                    order: order,
+                                                    lang: lang,
+                                                  );
+                                                }
                                                 if (context.mounted) {
-                                                  _showFinalBillDialog(context, order, settings.cashierPhone, lang);
+                                                  _showFinalBillDialog(
+                                                    context,
+                                                    order,
+                                                    settings.cashierPhone,
+                                                    lang,
+                                                    telegramResult: tgRes,
+                                                  );
                                                 }
                                               },
-                                              icon: const Icon(Icons.receipt, color: Colors.white, size: 16),
+                                              icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 16),
                                               label: Text(
                                                 AppStrings.get('send_final_bill', lang),
                                                 style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold),
                                               ),
                                               style: ElevatedButton.styleFrom(
-                                                backgroundColor: const Color(0xFF25D366),
+                                                backgroundColor: const Color(0xFF0088CC),
                                                 foregroundColor: Colors.white,
                                                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                                 elevation: 2,
+                                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                               ),
                                             ),
 
