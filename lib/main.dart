@@ -9,8 +9,10 @@ import 'providers/tables_provider.dart';
 import 'providers/cart_provider.dart';
 import 'providers/orders_provider.dart';
 import 'providers/addons_provider.dart';
+import 'providers/app_status_provider.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
+import 'screens/app_disabled_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +20,7 @@ void main() async {
   runApp(
     MultiProvider(
       providers: [
+        ChangeNotifierProvider(create: (_) => AppStatusProvider()),
         ChangeNotifierProvider(create: (_) => LocaleProvider()),
         ChangeNotifierProvider(create: (_) => SettingsProvider()),
         ChangeNotifierProvider(create: (_) => MenuProvider()),
@@ -37,6 +40,7 @@ class CabraWaiterApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final localeProvider = Provider.of<LocaleProvider>(context);
+    final appStatus = Provider.of<AppStatusProvider>(context);
 
     return MaterialApp(
       title: 'كابرا بين - Cabra Bean',
@@ -52,7 +56,9 @@ class CabraWaiterApp extends StatelessWidget {
         GlobalWidgetsLocalizations.delegate,
         GlobalCupertinoLocalizations.delegate,
       ],
-      home: const HomeScreen(),
+      home: appStatus.isEnabled
+          ? const HomeScreen()
+          : const AppDisabledScreen(),
     );
   }
 }
