@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -10,7 +9,6 @@ class AppStatusProvider with ChangeNotifier, WidgetsBindingObserver {
   bool _isEnabled = true;
   bool _isChecking = false;
   String? _errorMessage;
-  Timer? _periodicTimer;
 
   bool get isEnabled => _isEnabled;
   bool get isChecking => _isChecking;
@@ -31,18 +29,13 @@ class AppStatusProvider with ChangeNotifier, WidgetsBindingObserver {
       }
     } catch (_) {}
 
-    // 2. Perform background check immediately
+    // 2. Perform background check on app entry
     await checkStatus();
-
-    // 3. Periodic background check every 2 minutes while app is open
-    _periodicTimer?.cancel();
-    _periodicTimer = Timer.periodic(const Duration(minutes: 2), (_) {
-      checkStatus();
-    });
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    // Check only upon re-entering the app from background
     if (state == AppLifecycleState.resumed) {
       checkStatus();
     }
@@ -85,7 +78,6 @@ class AppStatusProvider with ChangeNotifier, WidgetsBindingObserver {
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _periodicTimer?.cancel();
     super.dispose();
   }
 }
