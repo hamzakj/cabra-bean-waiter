@@ -67,17 +67,93 @@ class DBHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS menu_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        category TEXT NOT NULL,
+        price_small REAL,
+        price_medium REAL,
+        price_large REAL,
+        description TEXT,
+        is_available INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS tables (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        number INTEGER NOT NULL UNIQUE,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        section TEXT NOT NULL DEFAULT 'indoor',
+        is_occupied INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_number TEXT NOT NULL,
+        table_id INTEGER NOT NULL,
+        table_number INTEGER NOT NULL,
+        table_name TEXT NOT NULL,
+        waiter_name TEXT NOT NULL,
+        status TEXT NOT NULL DEFAULT 'new',
+        total_amount REAL NOT NULL,
+        general_notes TEXT,
+        created_at TEXT NOT NULL
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS order_items (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        order_id INTEGER NOT NULL,
+        menu_item_id INTEGER NOT NULL,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        size TEXT NOT NULL,
+        unit_price REAL NOT NULL,
+        quantity INTEGER NOT NULL,
+        notes TEXT,
+        FOREIGN KEY (order_id) REFERENCES orders (id) ON DELETE CASCADE
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
+
     final catCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM categories')) ?? 0;
     if (catCount == 0) {
       for (var cat in _getInitialCategories()) {
-        await db.insert('categories', cat.toMap());
+        await db.insert('categories', cat.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     }
 
     final addonCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM addons')) ?? 0;
     if (addonCount == 0) {
       for (var addon in _getInitialAddons()) {
-        await db.insert('addons', addon.toMap());
+        await db.insert('addons', addon.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    }
+
+    final itemCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM menu_items')) ?? 0;
+    if (itemCount == 0) {
+      for (var item in _getInitialItems()) {
+        await db.insert('menu_items', item, conflictAlgorithm: ConflictAlgorithm.ignore);
+      }
+    }
+
+    final tableCount = Sqflite.firstIntValue(await db.rawQuery('SELECT COUNT(*) FROM tables')) ?? 0;
+    if (tableCount == 0) {
+      for (var t in _getInitialTables()) {
+        await db.insert('tables', t, conflictAlgorithm: ConflictAlgorithm.ignore);
       }
     }
   }
@@ -88,9 +164,17 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _onUpgrade,
+      onOpen: (db) async {
+        await _ensureNewTables(db);
+      },
     );
+  }
+
+  Future<void> _onUpgrade(Database db, int oldVersion, int newVersion) async {
+    await _ensureNewTables(db);
   }
 
   Future<void> _createDB(Database db, int version) async {
@@ -156,29 +240,50 @@ class DBHelper {
       )
     ''');
 
+    await db.execute('''
+      CREATE TABLE categories (
+        id TEXT PRIMARY KEY,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        icon TEXT NOT NULL DEFAULT 'coffee',
+        sort_order INTEGER NOT NULL DEFAULT 0
+      )
+    ''');
+
+    await db.execute('''
+      CREATE TABLE addons (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        name_ar TEXT NOT NULL,
+        name_en TEXT NOT NULL,
+        price REAL NOT NULL DEFAULT 0.0,
+        category TEXT NOT NULL DEFAULT 'all',
+        is_available INTEGER NOT NULL DEFAULT 1
+      )
+    ''');
+
     await _seedDatabase(db);
   }
 
   Future<void> _seedDatabase(Database db) async {
-    await db.insert('settings', {'key': 'cashier_phone', 'value': '962791046258'});
-    await db.insert('settings', {'key': 'waiter_name', 'value': 'أحمد (النادل)'});
-    await db.insert('settings', {'key': 'language', 'value': 'ar'});
-    await db.insert('settings', {'key': 'cafe_name', 'value': 'Cabra Bean - كابرا بين'});
+    await db.insert('settings', {'key': 'cashier_phone', 'value': '962791046258'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('settings', {'key': 'waiter_name', 'value': 'أحمد (النادل)'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('settings', {'key': 'language', 'value': 'ar'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('settings', {'key': 'cafe_name', 'value': 'Cabra Bean - كابرا بين'}, conflictAlgorithm: ConflictAlgorithm.ignore);
 
     for (var t in _getInitialTables()) {
-      await db.insert('tables', t);
+      await db.insert('tables', t, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     for (var item in _getInitialItems()) {
-      await db.insert('menu_items', item);
+      await db.insert('menu_items', item, conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     for (var cat in _getInitialCategories()) {
-      await db.insert('categories', cat.toMap());
+      await db.insert('categories', cat.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
     }
 
     for (var addon in _getInitialAddons()) {
-      await db.insert('addons', addon.toMap());
+      await db.insert('addons', addon.toMap(), conflictAlgorithm: ConflictAlgorithm.ignore);
     }
   }
 
