@@ -60,4 +60,14 @@ class TableInfo {
       isOccupied: isOccupied ?? this.isOccupied,
     );
   }
+
+  @override
+  bool operator ==(Object other) =>
+      identical(this, other) ||
+      other is TableInfo &&
+          runtimeType == other.runtimeType &&
+          number == other.number;
+
+  @override
+  int get hashCode => number.hashCode;
 }

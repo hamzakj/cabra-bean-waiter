@@ -29,7 +29,18 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
   Order? _findActiveOrderForTable(List<Order> orders, int tableNumber) {
     try {
       return orders.firstWhere(
-        (o) => o.tableNumber == tableNumber && ['new', 'preparing', 'served'].contains(o.status),
+        (o) => (o.tableNumber == tableNumber || o.tableId == tableNumber) &&
+            ['new', 'preparing', 'served'].contains(o.status),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Order? _findLatestOrderForTable(List<Order> orders, int tableNumber) {
+    try {
+      return orders.firstWhere(
+        (o) => (o.tableNumber == tableNumber || o.tableId == tableNumber),
       );
     } catch (_) {
       return null;
@@ -40,6 +51,7 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
     BuildContext context, {
     required TableInfo table,
     required Order activeOrder,
+    bool isCompleted = false,
   }) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
     final lang = Provider.of<LocaleProvider>(context, listen: false).langCode;
@@ -262,139 +274,209 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                       ),
                       const SizedBox(height: 16),
 
-                      // Action Button 1: Print Merged Bill via Wi-Fi
-                      SizedBox(
-                        width: double.infinity,
-                        height: 50,
-                        child: ElevatedButton.icon(
-                          onPressed: isPrinting
-                              ? null
-                              : () async {
-                                  setDialogState(() => isPrinting = true);
-                                  final result = await WifiPrinterService.printTableBill(
-                                    ip: settings.printerIp,
-                                    port: settings.printerPort,
-                                    cafeName: settings.cafeName,
-                                    tableName: table.nameAr,
-                                    tableNumber: table.number,
-                                    items: activeOrder.items,
-                                    totalAmount: activeOrder.totalAmount,
-                                    orderId: activeOrder.id,
-                                    waiterName: activeOrder.waiterName.isNotEmpty ? activeOrder.waiterName : settings.waiterName,
-                                    generalNotes: activeOrder.generalNotes,
-                                    isAddition: false,
-                                  );
-                                  setDialogState(() => isPrinting = false);
+                      // Action Button 1: Print Merged Bill via Wi-Fi (if enabled)
+                      if (settings.enablePrinter) ...[
+                          SizedBox(
+                            width: double.infinity,
+                            height: 46,
+                            child: ElevatedButton.icon(
+                              onPressed: isPrinting
+                                  ? null
+                                  : () async {
+                                      setDialogState(() => isPrinting = true);
+                                      final result = await WifiPrinterService.printTableBill(
+                                        ip: settings.printerIp,
+                                        port: settings.printerPort,
+                                        cafeName: settings.cafeName,
+                                        tableName: table.nameAr,
+                                        tableNumber: table.number,
+                                        items: activeOrder.items,
+                                        totalAmount: activeOrder.totalAmount,
+                                        orderId: activeOrder.id,
+                                        waiterName: activeOrder.waiterName.isNotEmpty ? activeOrder.waiterName : settings.waiterName,
+                                        generalNotes: activeOrder.generalNotes,
+                                        isAddition: false,
+                                      );
+                                      setDialogState(() => isPrinting = false);
 
-                                  if (context.mounted) {
+                                      if (context.mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text(result.message),
+                                            backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                                            duration: const Duration(seconds: 4),
+                                          ),
+                                        );
+                                      }
+                                    },
+                              icon: isPrinting
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                    )
+                                  : const Icon(Icons.print_rounded, color: Colors.white, size: 22),
+                              label: Text(
+                                isPrinting
+                                    ? (isAr ? 'جاري إرسال الفاتورة للطابعة...' : 'Printing...')
+                                    : (isAr ? 'طباعة الفاتورة المدمجة (Wi-Fi) 🖨️' : 'Print Merged Bill (Wi-Fi) 🖨️'),
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+                              ),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: AppTheme.primaryAmber,
+                                foregroundColor: Colors.white,
+                                elevation: 2,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                        ],
+
+                        // Action Button 2: Telegram Final Bill to Cashier (Always kept in table status)
+                        SizedBox(
+                          width: double.infinity,
+                          height: 46,
+                          child: ElevatedButton.icon(
+                            onPressed: () async {
+                              if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  const SnackBar(
+                                    content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                                    backgroundColor: AppTheme.statusOrange,
+                                  ),
+                                );
+                                return;
+                              }
+                              final res = await TelegramService.sendFinalBill(
+                                botToken: settings.telegramBotToken,
+                                chatId: settings.telegramChatId,
+                                order: activeOrder,
+                                lang: lang,
+                              );
+                              if (ctx.mounted) {
+                                ScaffoldMessenger.of(ctx).showSnackBar(
+                                  SnackBar(
+                                    content: Text(res.message),
+                                    backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                                    duration: const Duration(seconds: 4),
+                                  ),
+                                );
+                              }
+                            },
+                            icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
+                            label: Text(
+                              isAr ? 'إرسال الفاتورة للمحاسبة (تليجرام) 🧾' : 'Send Final Bill to Cashier (Telegram) 🧾',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                            ),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF0088CC),
+                              foregroundColor: Colors.white,
+                              elevation: 2,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            ),
+                          ),
+                        ),
+
+                        // Action Button 3: WhatsApp to Cashier (Backup - if enabled)
+                        if (settings.enableWhatsapp) ...[
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: OutlinedButton.icon(
+                              onPressed: () {
+                                WhatsAppService.sendFinalBillToCashier(
+                                  cashierPhone: settings.cashierPhone,
+                                  order: activeOrder,
+                                  lang: lang,
+                                );
+                              },
+                              icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
+                              label: Text(
+                                isAr ? 'إرسال الفاتورة عبر واتساب (احتياطي) 💬' : 'Send Bill via WhatsApp (Backup) 💬',
+                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
+                              ),
+                              style: OutlinedButton.styleFrom(
+                                side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                        const SizedBox(height: 10),
+
+                        // Secondary Row: Add items to table OR Check out
+                        if (!isCompleted)
+                          Row(
+                            children: [
+                              Expanded(
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    final cart = Provider.of<CartProvider>(context, listen: false);
+                                    cart.selectTable(table);
+                                    Navigator.pop(ctx);
+                                    if (widget.onSwitchToMenu != null) {
+                                      widget.onSwitchToMenu!(0);
+                                    }
                                     ScaffoldMessenger.of(context).showSnackBar(
                                       SnackBar(
-                                        content: Text(result.message),
-                                        backgroundColor: result.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                                        duration: const Duration(seconds: 4),
+                                        content: Text(isAr ? 'تم تحديد ${table.nameAr} - يمكنك إضافة أصناف الآن' : 'Table selected for adding items'),
+                                        backgroundColor: AppTheme.primaryCoffee,
+                                        duration: const Duration(seconds: 2),
                                       ),
                                     );
-                                  }
-                                },
-                          icon: isPrinting
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
-                                )
-                              : const Icon(Icons.print_rounded, color: Colors.white, size: 22),
-                          label: Text(
-                            isPrinting
-                                ? (isAr ? 'جاري إرسال الفاتورة للطابعة...' : 'Printing...')
-                                : (isAr ? 'طباعة الفاتورة المدمجة (Wi-Fi) 🖨️' : 'Print Merged Bill (Wi-Fi) 🖨️'),
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: AppTheme.primaryAmber,
-                            foregroundColor: Colors.white,
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Action Button 2: Telegram Final Bill to Cashier
-                      SizedBox(
-                        width: double.infinity,
-                        height: 46,
-                        child: ElevatedButton.icon(
-                          onPressed: () async {
-                            if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                const SnackBar(
-                                  content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
-                                  backgroundColor: AppTheme.statusOrange,
+                                  },
+                                  icon: const Icon(Icons.add_shopping_cart, size: 18, color: AppTheme.primaryCoffee),
+                                  label: Text(
+                                    isAr ? '+ إضافة طلب جديد' : '+ Add items',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee),
+                                  ),
+                                  style: OutlinedButton.styleFrom(
+                                    side: const BorderSide(color: AppTheme.primaryCoffee),
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
                                 ),
-                              );
-                              return;
-                            }
-                            final res = await TelegramService.sendFinalBill(
-                              botToken: settings.telegramBotToken,
-                              chatId: settings.telegramChatId,
-                              order: activeOrder,
-                              lang: lang,
-                            );
-                            if (ctx.mounted) {
-                              ScaffoldMessenger.of(ctx).showSnackBar(
-                                SnackBar(
-                                  content: Text(res.message),
-                                  backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                                  duration: const Duration(seconds: 4),
+                              ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: ElevatedButton.icon(
+                                  onPressed: () async {
+                                    final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+                                    final tablesProvider = Provider.of<TablesProvider>(context, listen: false);
+                                    await ordersProvider.completeAllOrdersForTable(table.number);
+                                    await tablesProvider.loadTables();
+                                    if (ctx.mounted) Navigator.pop(ctx);
+                                    if (context.mounted) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        SnackBar(
+                                          content: Text(isAr ? 'تم إغلاق ومحاسبة ${table.nameAr} وإخلاء الطاولة بنجاح ✓' : 'Table closed & completed'),
+                                          backgroundColor: AppTheme.statusGreen,
+                                        ),
+                                      );
+                                    }
+                                  },
+                                  icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
+                                  label: Text(
+                                    isAr ? 'محاسبة وإخلاء' : 'Close Table',
+                                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                                  ),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppTheme.primaryCoffee,
+                                    foregroundColor: Colors.white,
+                                    padding: const EdgeInsets.symmetric(vertical: 10),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
                                 ),
-                              );
-                            }
-                          },
-                          icon: const Icon(Icons.receipt_long_rounded, color: Colors.white, size: 20),
-                          label: Text(
-                            isAr ? 'إرسال الفاتورة للمحاسبة (تليجرام) 🧾' : 'Send Final Bill to Cashier (Telegram) 🧾',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFF0088CC),
-                            foregroundColor: Colors.white,
-                            elevation: 2,
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Action Button 3: WhatsApp to Cashier (Backup)
-                      SizedBox(
-                        width: double.infinity,
-                        height: 44,
-                        child: OutlinedButton.icon(
-                          onPressed: () {
-                            WhatsAppService.sendFinalBillToCashier(
-                              cashierPhone: settings.cashierPhone,
-                              order: activeOrder,
-                              lang: lang,
-                            );
-                          },
-                          icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
-                          label: Text(
-                            isAr ? 'إرسال الفاتورة عبر واتساب (احتياطي) 💬' : 'Send Bill via WhatsApp (Backup) 💬',
-                            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
-                          ),
-                          style: OutlinedButton.styleFrom(
-                            side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Secondary Row: Add items to table OR Check out
-                      Row(
-                        children: [
-                          Expanded(
-                            child: OutlinedButton.icon(
+                              ),
+                            ],
+                          )
+                        else
+                          SizedBox(
+                            width: double.infinity,
+                            height: 44,
+                            child: ElevatedButton.icon(
                               onPressed: () {
                                 final cart = Provider.of<CartProvider>(context, listen: false);
                                 cart.selectTable(table);
@@ -402,47 +484,10 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                                 if (widget.onSwitchToMenu != null) {
                                   widget.onSwitchToMenu!(0);
                                 }
-                                ScaffoldMessenger.of(context).showSnackBar(
-                                  SnackBar(
-                                    content: Text(isAr ? 'تم تحديد ${table.nameAr} - يمكنك إضافة أصناف الآن' : 'Table selected for adding items'),
-                                    backgroundColor: AppTheme.primaryCoffee,
-                                    duration: const Duration(seconds: 2),
-                                  ),
-                                );
                               },
-                              icon: const Icon(Icons.add_shopping_cart, size: 18, color: AppTheme.primaryCoffee),
+                              icon: const Icon(Icons.add_shopping_cart, size: 18, color: Colors.white),
                               label: Text(
-                                isAr ? '+ إضافة طلب جديد' : '+ Add items',
-                                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee),
-                              ),
-                              style: OutlinedButton.styleFrom(
-                                side: const BorderSide(color: AppTheme.primaryCoffee),
-                                padding: const EdgeInsets.symmetric(vertical: 10),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () async {
-                                final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
-                                final tablesProvider = Provider.of<TablesProvider>(context, listen: false);
-                                await ordersProvider.updateStatus(activeOrder.id!, 'completed');
-                                await tablesProvider.loadTables();
-                                if (ctx.mounted) Navigator.pop(ctx);
-                                if (context.mounted) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text(isAr ? 'تم إغلاق ومحاسبة ${table.nameAr} وإخلاء الطاولة بنجاح ✓' : 'Table closed & completed'),
-                                      backgroundColor: AppTheme.statusGreen,
-                                    ),
-                                  );
-                                }
-                              },
-                              icon: const Icon(Icons.check_circle_outline, size: 18, color: Colors.white),
-                              label: Text(
-                                isAr ? 'محاسبة وإخلاء' : 'Close Table',
+                                isAr ? 'بدء طلب جديد لهذه الطاولة' : 'Start New Order for Table',
                                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
                               ),
                               style: ElevatedButton.styleFrom(
@@ -453,8 +498,6 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                               ),
                             ),
                           ),
-                        ],
-                      ),
                     ],
                   ),
                 ),
@@ -608,6 +651,7 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                           itemBuilder: (context, index) {
                             final table = filteredTables[index];
                             final activeOrder = _findActiveOrderForTable(activeOrders, table.number);
+                            final latestOrder = _findLatestOrderForTable(ordersProvider.orders, table.number);
                             final isOccupied = activeOrder != null;
                             final isSelectedInCart = cartProvider.selectedTable?.number == table.number;
 
@@ -758,11 +802,45 @@ class _TablesStatusTabState extends State<TablesStatusTab> {
                                         Row(
                                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                           children: [
-                                            Text(
-                                              isAr ? 'متاحة للطلب' : 'Available',
-                                              style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                            Expanded(
+                                              child: Text(
+                                                isAr ? 'متاحة للطلب' : 'Available',
+                                                style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600),
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
                                             ),
-                                            const Icon(Icons.arrow_forward_rounded, size: 16, color: AppTheme.primaryCoffee),
+                                            if (latestOrder != null)
+                                              InkWell(
+                                                onTap: () {
+                                                  _showTableOrderDetailsDialog(
+                                                    context,
+                                                    table: table,
+                                                    activeOrder: latestOrder,
+                                                    isCompleted: true,
+                                                  );
+                                                },
+                                                child: Container(
+                                                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                                                  decoration: BoxDecoration(
+                                                    color: const Color(0xFF0088CC).withOpacity(0.12),
+                                                    borderRadius: BorderRadius.circular(6),
+                                                    border: Border.all(color: const Color(0xFF0088CC).withOpacity(0.3)),
+                                                  ),
+                                                  child: Row(
+                                                    mainAxisSize: MainAxisSize.min,
+                                                    children: [
+                                                      const Icon(Icons.receipt_long, size: 13, color: Color(0xFF0088CC)),
+                                                      const SizedBox(width: 3),
+                                                      Text(
+                                                        isAr ? 'فاتورة 🧾' : 'Bill 🧾',
+                                                        style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF0088CC)),
+                                                      ),
+                                                    ],
+                                                  ),
+                                                ),
+                                              )
+                                            else
+                                              const Icon(Icons.arrow_forward_rounded, size: 16, color: AppTheme.primaryCoffee),
                                           ],
                                         ),
                                       ],

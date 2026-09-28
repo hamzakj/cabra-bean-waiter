@@ -147,9 +147,9 @@ class _CartPanelState extends State<CartPanel> {
       // Refresh tables to reflect occupancy
       await tablesProvider.loadTables();
 
-      // Send Preparation Order via Telegram Bot if configured
+      // Send Preparation Order via Telegram Bot if enabled & configured
       TelegramResult? telegramResult;
-      if (settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
+      if (settings.enableTelegram && settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
         telegramResult = await TelegramService.sendPreparationOrder(
           botToken: settings.telegramBotToken,
           chatId: settings.telegramChatId,
@@ -159,8 +159,8 @@ class _CartPanelState extends State<CartPanel> {
           addedItemsOnly: isMerged ? result.addedItems : null,
           previousTotal: isMerged ? result.previousTotal : null,
         );
-      } else {
-        // Fallback to WhatsApp if Telegram is not configured yet
+      } else if (settings.enableWhatsapp) {
+        // Fallback to WhatsApp if WhatsApp is enabled
         await WhatsAppService.sendOrderToCashier(
           cashierPhone: settings.cashierPhone,
           order: order,
@@ -171,8 +171,8 @@ class _CartPanelState extends State<CartPanel> {
         );
       }
 
-      // Auto-print bill via Wi-Fi if enabled in settings
-      if (settings.autoPrintBill) {
+      // Auto-print bill via Wi-Fi if printer is enabled & auto-print is on
+      if (settings.enablePrinter && settings.autoPrintBill) {
         WifiPrinterService.printTableBill(
           ip: settings.printerIp,
           port: settings.printerPort,
@@ -254,7 +254,7 @@ class _CartPanelState extends State<CartPanel> {
                 const SizedBox(height: 12),
 
                 // Telegram Status Banner
-                if (telegramResult != null)
+                if (settings.enableTelegram && telegramResult != null)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
@@ -286,7 +286,7 @@ class _CartPanelState extends State<CartPanel> {
                       ],
                     ),
                   )
-                else if (settings.telegramBotToken.isEmpty)
+                else if (settings.enableTelegram && settings.telegramBotToken.isEmpty)
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(10),
@@ -301,123 +301,126 @@ class _CartPanelState extends State<CartPanel> {
                     ),
                   ),
 
-                const SizedBox(height: 14),
+                if (settings.enableTelegram) const SizedBox(height: 14),
 
                 // Button 1: Re-send via Telegram
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: ElevatedButton.icon(
-                    onPressed: () async {
-                      if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          const SnackBar(
-                            content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
-                            backgroundColor: AppTheme.statusOrange,
-                          ),
+                if (settings.enableTelegram)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            const SnackBar(
+                              content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                              backgroundColor: AppTheme.statusOrange,
+                            ),
+                          );
+                          return;
+                        }
+                        final res = await TelegramService.sendPreparationOrder(
+                          botToken: settings.telegramBotToken,
+                          chatId: settings.telegramChatId,
+                          order: order,
+                          lang: lang,
+                          isAddition: isMerged,
+                          addedItemsOnly: isMerged ? result.addedItems : null,
+                          previousTotal: isMerged ? result.previousTotal : null,
                         );
-                        return;
-                      }
-                      final res = await TelegramService.sendPreparationOrder(
-                        botToken: settings.telegramBotToken,
-                        chatId: settings.telegramChatId,
-                        order: order,
-                        lang: lang,
-                        isAddition: isMerged,
-                        addedItemsOnly: isMerged ? result.addedItems : null,
-                        previousTotal: isMerged ? result.previousTotal : null,
-                      );
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text(res.message),
-                            backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                          ),
-                        );
-                      }
-                    },
-                    icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                    label: const Text(
-                      'إرسال طلب التحضير (تليجرام) 🚀',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF0088CC),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text(res.message),
+                              backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                      label: const Text(
+                        'إرسال طلب التحضير (تليجرام) 🚀',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF0088CC),
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 8),
+                if (settings.enableTelegram && settings.enableWhatsapp) const SizedBox(height: 8),
 
                 // Button 2: WhatsApp (Backup)
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    onPressed: () {
-                      WhatsAppService.sendOrderToCashier(
-                        cashierPhone: settings.cashierPhone,
-                        order: order,
-                        lang: lang,
-                        isAddition: isMerged,
-                        addedItemsOnly: isMerged ? result.addedItems : null,
-                        previousTotal: isMerged ? result.previousTotal : null,
-                      );
-                    },
-                    icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
-                    label: const Text(
-                      'إرسال عبر واتساب (احتياطي) 💬',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                if (settings.enableWhatsapp)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        WhatsAppService.sendOrderToCashier(
+                          cashierPhone: settings.cashierPhone,
+                          order: order,
+                          lang: lang,
+                          isAddition: isMerged,
+                          addedItemsOnly: isMerged ? result.addedItems : null,
+                          previousTotal: isMerged ? result.previousTotal : null,
+                        );
+                      },
+                      icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
+                      label: const Text(
+                        'إرسال عبر واتساب (احتياطي) 💬',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366)),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
-                ),
                 const SizedBox(height: 8),
 
                 // Button 3: Wi-Fi Print
-                SizedBox(
-                  width: double.infinity,
-                  height: 44,
-                  child: OutlinedButton.icon(
-                    onPressed: () async {
-                      final printRes = await WifiPrinterService.printTableBill(
-                        ip: settings.printerIp,
-                        port: settings.printerPort,
-                        cafeName: settings.cafeName,
-                        tableName: order.tableName,
-                        tableNumber: order.tableNumber,
-                        items: order.items,
-                        totalAmount: order.totalAmount,
-                        orderId: order.id,
-                        waiterName: settings.waiterName,
-                        generalNotes: generalNotes,
-                        isAddition: isMerged,
-                      );
-                      if (ctx.mounted) {
-                        ScaffoldMessenger.of(ctx).showSnackBar(
-                          SnackBar(
-                            content: Text(printRes.message),
-                            backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                            duration: const Duration(seconds: 4),
-                          ),
+                if (settings.enablePrinter)
+                  SizedBox(
+                    width: double.infinity,
+                    height: 44,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final printRes = await WifiPrinterService.printTableBill(
+                          ip: settings.printerIp,
+                          port: settings.printerPort,
+                          cafeName: settings.cafeName,
+                          tableName: order.tableName,
+                          tableNumber: order.tableNumber,
+                          items: order.items,
+                          totalAmount: order.totalAmount,
+                          orderId: order.id,
+                          waiterName: settings.waiterName,
+                          generalNotes: generalNotes,
+                          isAddition: isMerged,
                         );
-                      }
-                    },
-                    icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 18),
-                    label: const Text(
-                      'طباعة الفاتورة (Wi-Fi) 🖨️',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        if (ctx.mounted) {
+                          ScaffoldMessenger.of(ctx).showSnackBar(
+                            SnackBar(
+                              content: Text(printRes.message),
+                              backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                              duration: const Duration(seconds: 4),
+                            ),
+                          );
+                        }
+                      },
+                      icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 18),
+                      label: const Text(
+                        'طباعة الفاتورة (Wi-Fi) 🖨️',
+                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
-                ),
               ],
             ),
             actions: [
@@ -451,6 +454,8 @@ class _CartPanelState extends State<CartPanel> {
     final isAr = lang == 'ar';
     final cart = Provider.of<CartProvider>(context);
     final tablesProvider = Provider.of<TablesProvider>(context);
+    final ordersProvider = Provider.of<OrdersProvider>(context);
+    final settings = Provider.of<SettingsProvider>(context);
     final currency = AppStrings.get('currency', lang);
 
     if (cart.selectedTable == null && tablesProvider.tables.isNotEmpty) {
@@ -461,7 +466,23 @@ class _CartPanelState extends State<CartPanel> {
       });
     }
 
-    final isTableOccupied = cart.selectedTable?.isOccupied ?? false;
+    final selectedTableFromProvider = cart.selectedTable != null
+        ? tablesProvider.getTableByNumber(cart.selectedTable!.number)
+        : null;
+    final isTableOccupied = selectedTableFromProvider != null &&
+        ordersProvider.orders.any((o) =>
+            o.tableNumber == selectedTableFromProvider.number &&
+            ['new', 'preparing', 'served'].contains(o.status));
+
+    // Ensure distinct tables for dropdown and safely matched selected value
+    final uniqueTablesMap = <int, TableInfo>{};
+    for (final t in tablesProvider.tables) {
+      uniqueTablesMap[t.number] = t;
+    }
+    final dropdownTables = uniqueTablesMap.values.toList();
+    final TableInfo? selectedDropdownTable = cart.selectedTable != null
+        ? uniqueTablesMap[cart.selectedTable!.number]
+        : null;
 
     return Container(
       decoration: BoxDecoration(
@@ -570,7 +591,7 @@ class _CartPanelState extends State<CartPanel> {
                   ),
                   child: DropdownButtonHideUnderline(
                     child: DropdownButton<TableInfo>(
-                      value: cart.selectedTable,
+                      value: selectedDropdownTable,
                       hint: Row(
                         children: [
                           const Icon(Icons.table_restaurant_outlined, color: AppTheme.primaryAmber, size: 20),
@@ -583,7 +604,11 @@ class _CartPanelState extends State<CartPanel> {
                       ),
                       isExpanded: true,
                       icon: const Icon(Icons.keyboard_arrow_down, color: AppTheme.primaryCoffee),
-                      items: tablesProvider.tables.map((table) {
+                      items: dropdownTables.map((table) {
+                        final isTableBusy = ordersProvider.orders.any(
+                          (o) => o.tableNumber == table.number &&
+                              ['new', 'preparing', 'served'].contains(o.status),
+                        );
                         return DropdownMenuItem<TableInfo>(
                           value: table,
                           child: Row(
@@ -600,19 +625,19 @@ class _CartPanelState extends State<CartPanel> {
                               Container(
                                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: table.isOccupied
+                                  color: isTableBusy
                                       ? AppTheme.statusOrange.withValues(alpha: 0.15)
                                       : AppTheme.statusGreen.withValues(alpha: 0.15),
                                   borderRadius: BorderRadius.circular(8),
                                 ),
                                 child: Text(
-                                  table.isOccupied
+                                  isTableBusy
                                       ? AppStrings.get('occupied', lang)
                                       : AppStrings.get('available', lang),
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.bold,
-                                    color: table.isOccupied ? AppTheme.statusOrange : AppTheme.statusGreen,
+                                    color: isTableBusy ? AppTheme.statusOrange : AppTheme.statusGreen,
                                   ),
                                 ),
                               ),
@@ -948,38 +973,44 @@ class _CartPanelState extends State<CartPanel> {
                               Text(
                                 isTableOccupied
                                     ? (isAr ? 'دمج وإرسال طلب التحضير 🚀' : 'Merge & Send Prep Order 🚀')
-                                    : (isAr ? 'إرسال طلب التحضير (تليجرام) 🚀' : 'Send Prep Order (Telegram) 🚀'),
+                                    : (settings.enableTelegram
+                                        ? (isAr ? 'إرسال طلب التحضير (تليجرام) 🚀' : 'Send Prep Order (Telegram) 🚀')
+                                        : (settings.enableWhatsapp
+                                            ? (isAr ? 'إرسال طلب التحضير (واتساب) 💬' : 'Send Prep Order (WhatsApp) 💬')
+                                            : (isAr ? 'تأكيد وحفظ الطلب ✓' : 'Confirm Order ✓'))),
                                 style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold),
                               ),
                             ],
                           ),
                   ),
                 ),
-                const SizedBox(height: 10),
 
                 // Wi-Fi Print Bill Button
-                SizedBox(
-                  width: double.infinity,
-                  height: 46,
-                  child: OutlinedButton.icon(
-                    onPressed: _isPrinting ? null : () => _handlePrintCartBill(context),
-                    icon: _isPrinting
-                        ? const SizedBox(
-                            width: 18,
-                            height: 18,
-                            child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryCoffee),
-                          )
-                        : const Icon(Icons.print_outlined, color: AppTheme.primaryCoffee, size: 20),
-                    label: Text(
-                      _isPrinting ? 'جاري إرسال الفاتورة...' : 'طباعة الفاتورة (Wi-Fi) 🖨️',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
-                    ),
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                if (settings.enablePrinter) ...[
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 46,
+                    child: OutlinedButton.icon(
+                      onPressed: _isPrinting ? null : () => _handlePrintCartBill(context),
+                      icon: _isPrinting
+                          ? const SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primaryCoffee),
+                            )
+                          : const Icon(Icons.print_outlined, color: AppTheme.primaryCoffee, size: 20),
+                      label: Text(
+                        _isPrinting ? 'جاري إرسال الفاتورة...' : 'طباعة الفاتورة (Wi-Fi) 🖨️',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: AppTheme.primaryCoffee),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
             ),
           ),

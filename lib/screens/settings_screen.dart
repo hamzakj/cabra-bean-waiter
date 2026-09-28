@@ -255,7 +255,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'إعدادات الاتصال والويتر',
                           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.textDark),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+
+                        // WhatsApp Enable Switch
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'تفعيل واتساب (WhatsApp)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                          ),
+                          subtitle: const Text(
+                            'إظهار أزرار إرسال الطلبات والفواتير عبر واتساب',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                          value: settings.enableWhatsapp,
+                          activeColor: const Color(0xFF25D366),
+                          onChanged: (val) {
+                            settings.setEnableWhatsapp(val);
+                          },
+                        ),
+                        const Divider(height: 16),
+                        const SizedBox(height: 6),
 
                         // Cashier WhatsApp Phone
                         TextField(
@@ -326,7 +346,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'إرسال طلبات تحضير المطبخ والبار، والفواتير النهائية للمحاسبة مباشرة عبر بوت تليجرام.',
                           style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+
+                        // Telegram Enable Switch
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'تفعيل بوت تليجرام (Telegram Bot)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                          ),
+                          subtitle: const Text(
+                            'إظهار أزرار إرسال الطلبات والفواتير عبر تليجرام',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                          value: settings.enableTelegram,
+                          activeColor: const Color(0xFF0088CC),
+                          onChanged: (val) {
+                            settings.setEnableTelegram(val);
+                          },
+                        ),
+                        const Divider(height: 16),
+                        const SizedBox(height: 8),
 
                         // Bot Token
                         TextField(
@@ -375,19 +415,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         // Test Telegram Button
                         SizedBox(
                           width: double.infinity,
-                          height: 44,
                           child: ElevatedButton.icon(
                             onPressed: _isTestingTelegram ? null : () => _handleTestTelegram(context, settings),
                             icon: _isTestingTelegram
                                 ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                                : const Icon(Icons.send, color: Colors.white, size: 18),
+                                : const Icon(Icons.send_rounded, color: Colors.white, size: 18),
                             label: Text(
-                              _isTestingTelegram ? 'جاري إرسال الرسالة التجريبية...' : 'إرسال رسالة تجريبية للبوت 🚀',
-                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                              _isTestingTelegram ? 'جاري إرسال الرسالة التجريبية...' : 'إرسال رسالة تجريبية للبوت',
+                              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
                             ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: const Color(0xFF0088CC),
                               foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                              minimumSize: const Size(double.infinity, 46),
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                             ),
                           ),
@@ -421,7 +462,27 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           'قم بربط طابعة الإيصالات الحرارية (80mm/58mm) عبر شبكة الواي فاي لطباعة فواتير الطاولات مباشرة.',
                           style: TextStyle(fontSize: 12.5, color: AppTheme.textMuted),
                         ),
-                        const SizedBox(height: 16),
+                        const SizedBox(height: 12),
+
+                        // Printer Enable Switch
+                        SwitchListTile.adaptive(
+                          contentPadding: EdgeInsets.zero,
+                          title: const Text(
+                            'تفعيل طابعة الفواتير (Thermal Printer)',
+                            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14.5),
+                          ),
+                          subtitle: const Text(
+                            'إظهار أزرار الطباعة والربط مع طابعة الفواتير',
+                            style: TextStyle(fontSize: 12, color: AppTheme.textMuted),
+                          ),
+                          value: settings.enablePrinter,
+                          activeColor: AppTheme.primaryAmber,
+                          onChanged: (val) {
+                            settings.setEnablePrinter(val);
+                          },
+                        ),
+                        const Divider(height: 16),
+                        const SizedBox(height: 8),
 
                         // Printer IP
                         TextField(

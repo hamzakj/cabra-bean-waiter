@@ -5,6 +5,7 @@ import '../models/category_item.dart';
 import '../providers/menu_provider.dart';
 import '../providers/cart_provider.dart';
 import '../providers/orders_provider.dart';
+import '../providers/tables_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -27,6 +28,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+        final tablesProvider = Provider.of<TablesProvider>(context, listen: false);
+        ordersProvider.onOrdersChanged = () {
+          tablesProvider.loadTables();
+        };
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -10,6 +10,9 @@ class SettingsProvider with ChangeNotifier {
   bool _autoPrintBill = false;
   String _telegramBotToken = '8660493989:AAHkm_gxp8VKlLXjGEa9O1z7rcWyZESZlxI';
   String _telegramChatId = '7663363866';
+  bool _enableWhatsapp = true;
+  bool _enablePrinter = true;
+  bool _enableTelegram = true;
 
   String get cashierPhone => _cashierPhone;
   String get waiterName => _waiterName;
@@ -19,6 +22,9 @@ class SettingsProvider with ChangeNotifier {
   bool get autoPrintBill => _autoPrintBill;
   String get telegramBotToken => _telegramBotToken;
   String get telegramChatId => _telegramChatId;
+  bool get enableWhatsapp => _enableWhatsapp;
+  bool get enablePrinter => _enablePrinter;
+  bool get enableTelegram => _enableTelegram;
 
   SettingsProvider() {
     loadSettings();
@@ -35,6 +41,12 @@ class SettingsProvider with ChangeNotifier {
     _autoPrintBill = autoPrintStr == '1';
     _telegramBotToken = await DBHelper.instance.getSetting('telegram_bot_token', defaultValue: '8660493989:AAHkm_gxp8VKlLXjGEa9O1z7rcWyZESZlxI');
     _telegramChatId = await DBHelper.instance.getSetting('telegram_chat_id', defaultValue: '7663363866');
+    final waStr = await DBHelper.instance.getSetting('enable_whatsapp', defaultValue: '1');
+    _enableWhatsapp = waStr != '0';
+    final prStr = await DBHelper.instance.getSetting('enable_printer', defaultValue: '1');
+    _enablePrinter = prStr != '0';
+    final tgStr = await DBHelper.instance.getSetting('enable_telegram', defaultValue: '1');
+    _enableTelegram = tgStr != '0';
     notifyListeners();
   }
 
@@ -77,6 +89,24 @@ class SettingsProvider with ChangeNotifier {
   Future<void> setTelegramChatId(String chatId) async {
     _telegramChatId = chatId.trim();
     await DBHelper.instance.setSetting('telegram_chat_id', _telegramChatId);
+    notifyListeners();
+  }
+
+  Future<void> setEnableWhatsapp(bool value) async {
+    _enableWhatsapp = value;
+    await DBHelper.instance.setSetting('enable_whatsapp', value ? '1' : '0');
+    notifyListeners();
+  }
+
+  Future<void> setEnablePrinter(bool value) async {
+    _enablePrinter = value;
+    await DBHelper.instance.setSetting('enable_printer', value ? '1' : '0');
+    notifyListeners();
+  }
+
+  Future<void> setEnableTelegram(bool value) async {
+    _enableTelegram = value;
+    await DBHelper.instance.setSetting('enable_telegram', value ? '1' : '0');
     notifyListeners();
   }
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../models/table_info.dart';
 import '../providers/tables_provider.dart';
+import '../providers/orders_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
 import '../theme/app_theme.dart';
@@ -121,6 +122,7 @@ class TablesManagementScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = Provider.of<LocaleProvider>(context).langCode;
+    final isAr = lang == 'ar';
     final tablesProvider = Provider.of<TablesProvider>(context);
 
     return Scaffold(
@@ -177,6 +179,42 @@ class TablesManagementScreen extends StatelessWidget {
                             ),
                             Row(
                               children: [
+                                if (table.isOccupied) ...[
+                                  InkWell(
+                                    onTap: () {
+                                      showDialog(
+                                        context: context,
+                                        builder: (ctx) => AlertDialog(
+                                          title: Text(isAr ? 'تفريغ وإخلاء الطاولة' : 'Vacate Table'),
+                                          content: Text(isAr
+                                              ? 'هل ترغب في إنهاء وتفريغ ${table.getName(lang)} وإلغاء إشغالها لتصبح فاضية؟'
+                                              : 'Vacate ${table.getName(lang)} and complete its orders?'),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(ctx),
+                                              child: Text(AppStrings.get('cancel', lang)),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () async {
+                                                final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+                                                await ordersProvider.completeAllOrdersForTable(table.number);
+                                                await tablesProvider.loadTables();
+                                                if (ctx.mounted) Navigator.pop(ctx);
+                                              },
+                                              style: ElevatedButton.styleFrom(backgroundColor: AppTheme.statusGreen),
+                                              child: Text(isAr ? 'تفريغ الطاولة ✓' : 'Vacate ✓'),
+                                            ),
+                                          ],
+                                        ),
+                                      );
+                                    },
+                                    child: const Tooltip(
+                                      message: 'تفريغ الطاولة',
+                                      child: Icon(Icons.cleaning_services_outlined, size: 18, color: AppTheme.statusOrange),
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                ],
                                 InkWell(
                                   onTap: () => _showTableDialog(context, table: table),
                                   child: const Icon(Icons.edit_outlined, size: 18, color: AppTheme.primaryCoffee),

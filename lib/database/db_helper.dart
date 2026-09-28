@@ -1158,11 +1158,34 @@ class DBHelper {
   Future<List<TableInfo>> getAllTables() async {
     if (kIsWeb) {
       _initWebStore();
-      return List.unmodifiable(_webTables);
+      final activeTableNumbers = _webOrders
+          .where((o) => ['new', 'preparing', 'served'].contains(o.status))
+          .map((o) => o.tableNumber)
+          .toSet();
+      return _webTables.map((t) => t.copyWith(isOccupied: activeTableNumbers.contains(t.number))).toList();
     }
     final db = await database;
+    final activeRows = await db.rawQuery(
+      'SELECT DISTINCT table_number FROM orders WHERE status IN ("new", "preparing", "served")',
+    );
+    final activeNumbers = activeRows.map((r) => r['table_number'] as int?).whereType<int>().toSet();
+
     final maps = await db.query('tables', orderBy: 'number ASC');
-    return maps.map((m) => TableInfo.fromMap(m)).toList();
+    final tables = maps.map((m) {
+      final t = TableInfo.fromMap(m);
+      final hasActive = activeNumbers.contains(t.number);
+      return t.copyWith(isOccupied: hasActive);
+    }).toList();
+
+    // Auto-heal table flags in sqlite if desynchronized
+    for (var t in tables) {
+      final origOccupied = maps.firstWhere((m) => m['id'] == t.id)['is_occupied'] == 1;
+      if (origOccupied != t.isOccupied) {
+        await db.update('tables', {'is_occupied': t.isOccupied ? 1 : 0}, where: 'id = ?', whereArgs: [t.id]);
+      }
+    }
+
+    return tables;
   }
 
   Future<int> insertTable(TableInfo table) async {
@@ -1253,8 +1276,8 @@ class DBHelper {
       await txn.update(
         'tables',
         {'is_occupied': 1},
-        where: 'id = ?',
-        whereArgs: [order.tableId],
+        where: 'number = ?',
+        whereArgs: [order.tableNumber],
       );
       return orderId;
     });
@@ -1311,17 +1334,44 @@ class DBHelper {
     if (status == 'completed' || status == 'cancelled') {
       final orderRes = await db.query('orders', where: 'id = ?', whereArgs: [orderId]);
       if (orderRes.isNotEmpty) {
-        final tableId = orderRes.first['table_id'] as int;
+        final tableNumber = orderRes.first['table_number'] as int? ?? orderRes.first['table_id'] as int;
         final activeOrders = await db.query(
           'orders',
-          where: 'table_id = ? AND status IN ("new", "preparing", "served")',
-          whereArgs: [tableId],
+          where: 'table_number = ? AND status IN ("new", "preparing", "served")',
+          whereArgs: [tableNumber],
         );
         if (activeOrders.isEmpty) {
-          await db.update('tables', {'is_occupied': 0}, where: 'id = ?', whereArgs: [tableId]);
+          await db.update('tables', {'is_occupied': 0}, where: 'number = ?', whereArgs: [tableNumber]);
         }
       }
     }
+  }
+
+  Future<void> completeAllOrdersForTable(int tableNumber) async {
+    if (kIsWeb) {
+      _initWebStore();
+      for (var o in _webOrders) {
+        if ((o.tableNumber == tableNumber || o.tableId == tableNumber) &&
+            ['new', 'preparing', 'served'].contains(o.status)) {
+          o.status = 'completed';
+        }
+      }
+      setTableOccupied(tableNumber, false);
+      return;
+    }
+    final db = await database;
+    await db.update(
+      'orders',
+      {'status': 'completed'},
+      where: '(table_number = ? OR table_id = ?) AND status IN ("new", "preparing", "served")',
+      whereArgs: [tableNumber, tableNumber],
+    );
+    await db.update(
+      'tables',
+      {'is_occupied': 0},
+      where: 'number = ? OR id = ?',
+      whereArgs: [tableNumber, tableNumber],
+    );
   }
 
   // --- Settings ---

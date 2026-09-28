@@ -13,6 +13,7 @@ class OrdersProvider with ChangeNotifier {
   String get statusFilter => _statusFilter;
   int? get tableFilter => _tableFilter;
   bool get isLoading => _isLoading;
+  VoidCallback? onOrdersChanged;
 
   OrdersProvider() {
     loadOrders();
@@ -28,6 +29,7 @@ class OrdersProvider with ChangeNotifier {
     }
     _isLoading = false;
     notifyListeners();
+    onOrdersChanged?.call();
   }
 
   void setStatusFilter(String status) {
@@ -140,6 +142,11 @@ class OrdersProvider with ChangeNotifier {
 
   Future<void> updateStatus(int orderId, String newStatus) async {
     await DBHelper.instance.updateOrderStatus(orderId, newStatus);
+    await loadOrders();
+  }
+
+  Future<void> completeAllOrdersForTable(int tableNumber) async {
+    await DBHelper.instance.completeAllOrdersForTable(tableNumber);
     await loadOrders();
   }
 }

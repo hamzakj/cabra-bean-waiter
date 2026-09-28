@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 import '../models/order.dart';
 import '../providers/orders_provider.dart';
+import '../providers/tables_provider.dart';
 import '../providers/settings_provider.dart';
 import '../providers/locale_provider.dart';
 import '../l10n/app_strings.dart';
@@ -51,16 +52,20 @@ class OrderTrackerScreen extends StatelessWidget {
 
   void _showFinalBillDialog(BuildContext context, Order order, String cashierPhone, String lang, {TelegramResult? telegramResult}) {
     final settings = Provider.of<SettingsProvider>(context, listen: false);
+    final isAr = lang == 'ar';
+    final isPaid = order.status == 'completed';
 
     showDialog(
       context: context,
       builder: (ctx) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Row(
-          children: const [
-            Icon(Icons.receipt_long, color: Color(0xFF0088CC), size: 28),
-            SizedBox(width: 8),
-            Text('الفاتورة النهائية للمحاسبة'),
+          children: [
+            const Icon(Icons.receipt_long, color: Color(0xFF0088CC), size: 28),
+            const SizedBox(width: 8),
+            Text(isPaid
+                ? (isAr ? 'فاتورة طلب مدفوع 🧾' : 'Paid Order Bill 🧾')
+                : (isAr ? 'الفاتورة النهائية للمحاسبة' : 'Final Bill for Cashier')),
           ],
         ),
         content: Column(
@@ -81,9 +86,28 @@ class OrderTrackerScreen extends StatelessWidget {
                     style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: AppTheme.primaryCoffee),
                   ),
                   const SizedBox(height: 6),
-                  Text(
-                    'المجموع النهائي المطلوب: ${order.totalAmount.toStringAsFixed(2)} د.أ',
-                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.statusGreen),
+                  Row(
+                    children: [
+                      Text(
+                        '${isPaid ? (isAr ? 'المبلغ المدفوع: ' : 'Paid: ') : (isAr ? 'المجموع المطلوب: ' : 'Required Total: ')}${order.totalAmount.toStringAsFixed(2)} د.أ',
+                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: AppTheme.statusGreen),
+                      ),
+                      if (isPaid) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: Colors.green.shade50,
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(color: Colors.green.shade600),
+                          ),
+                          child: Text(
+                            isAr ? 'تم الدفع ✓' : 'Paid ✓',
+                            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade700),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 4),
                   Text('إجمالي عدد المواد: ${order.items.fold(0, (sum, i) => sum + i.quantity)} صنف'),
@@ -127,95 +151,152 @@ class OrderTrackerScreen extends StatelessWidget {
               ),
 
             const SizedBox(height: 12),
-            const Text(
-              'هل ترغب بإرسال الفاتورة النهائية للمحاسبة وإغلاق الطاولة؟',
-              style: TextStyle(fontSize: 13),
+            Text(
+              isPaid
+                  ? (isAr ? 'تمت محاسبة هذا الطلب مسبقاً. يمكنك إعادة إرسال الفاتورة لتليجرام أو طباعتها:' : 'This order has already been paid. You can re-send the bill to Telegram or print it:')
+                  : (isAr ? 'هل ترغب بإرسال الفاتورة النهائية للمحاسبة وإغلاق الطاولة؟' : 'Would you like to send the final bill to cashier and close the table?'),
+              style: const TextStyle(fontSize: 13),
             ),
             const SizedBox(height: 14),
 
-            // Button 1: Send via Telegram
-            SizedBox(
-              width: double.infinity,
-              height: 46,
-              child: ElevatedButton.icon(
-                onPressed: () async {
-                  if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      const SnackBar(
-                        content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
-                        backgroundColor: AppTheme.statusOrange,
-                      ),
+            // Button 1: Send via Telegram (if enabled)
+            if (settings.enableTelegram) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 46,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    if (settings.telegramBotToken.isEmpty || settings.telegramChatId.isEmpty) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        const SnackBar(
+                          content: Text('يرجى ضبط Bot Token و Chat ID في الإعدادات أولاً'),
+                          backgroundColor: AppTheme.statusOrange,
+                        ),
+                      );
+                      return;
+                    }
+                    final res = await TelegramService.sendFinalBill(
+                      botToken: settings.telegramBotToken,
+                      chatId: settings.telegramChatId,
+                      order: order,
+                      lang: lang,
                     );
-                    return;
-                  }
-                  final res = await TelegramService.sendFinalBill(
-                    botToken: settings.telegramBotToken,
-                    chatId: settings.telegramChatId,
-                    order: order,
-                    lang: lang,
-                  );
-                  if (ctx.mounted) {
-                    ScaffoldMessenger.of(ctx).showSnackBar(
-                      SnackBar(
-                        content: Text(res.message),
-                        backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                      ),
-                    );
-                  }
-                },
-                icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
-                label: const Text('إرسال الفاتورة للمحاسبة (تليجرام) 🧾', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF0088CC),
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(res.message),
+                          backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.send_rounded, color: Colors.white, size: 18),
+                  label: const Text('إرسال الفاتورة للمحاسبة (تليجرام) 🧾', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13.5)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF0088CC),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ),
-            ),
-            const SizedBox(height: 8),
+              const SizedBox(height: 8),
+            ],
 
-            // Button 2: Send via WhatsApp (Backup)
-            SizedBox(
-              width: double.infinity,
-              height: 42,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  WhatsAppService.sendFinalBillToCashier(
-                    cashierPhone: cashierPhone,
-                    order: order,
-                    lang: lang,
-                  );
-                },
-                icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
-                label: const Text('إرسال عبر واتساب (احتياطي) 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366))),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            // Button 2: Wi-Fi Print Bill (if enabled)
+            if (settings.enablePrinter) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: OutlinedButton.icon(
+                  onPressed: () async {
+                    final res = await WifiPrinterService.printTableBill(
+                      ip: settings.printerIp,
+                      port: settings.printerPort,
+                      cafeName: settings.cafeName,
+                      tableName: order.tableName,
+                      tableNumber: order.tableNumber,
+                      items: order.items,
+                      totalAmount: order.totalAmount,
+                      orderId: order.id,
+                      waiterName: order.waiterName.isNotEmpty ? order.waiterName : settings.waiterName,
+                      generalNotes: order.generalNotes,
+                    );
+                    if (ctx.mounted) {
+                      ScaffoldMessenger.of(ctx).showSnackBar(
+                        SnackBar(
+                          content: Text(res.message),
+                          backgroundColor: res.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                        ),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 18),
+                  label: const Text('طباعة الفاتورة (Wi-Fi) 🖨️', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: AppTheme.primaryCoffee)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
                 ),
               ),
-            ),
+              const SizedBox(height: 8),
+            ],
+
+            // Button 3: Send via WhatsApp (Backup - if enabled)
+            if (settings.enableWhatsapp) ...[
+              SizedBox(
+                width: double.infinity,
+                height: 42,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    WhatsAppService.sendFinalBillToCashier(
+                      cashierPhone: cashierPhone,
+                      order: order,
+                      lang: lang,
+                    );
+                  },
+                  icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF25D366), size: 18),
+                  label: const Text('إرسال عبر واتساب (احتياطي) 💬', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Color(0xFF25D366))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF25D366), width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إبقاء الطاولة مفتوحة'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Provider.of<OrdersProvider>(context, listen: false).updateStatus(order.id!, 'completed');
-              Navigator.pop(ctx);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('تم إغلاق الطاولة ومحاسبتها بنجاح!'),
-                  backgroundColor: AppTheme.statusGreen,
+        actions: isPaid
+            ? [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(isAr ? 'إغلاق' : 'Close'),
                 ),
-              );
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryCoffee, foregroundColor: Colors.white),
-            child: const Text('إغلاق ومحاسبة الطاولة ✓'),
-          ),
-        ],
+              ]
+            : [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: Text(isAr ? 'إبقاء الطاولة مفتوحة' : 'Keep Table Open'),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    final ordersProvider = Provider.of<OrdersProvider>(context, listen: false);
+                    final tablesProvider = Provider.of<TablesProvider>(context, listen: false);
+                    await ordersProvider.completeAllOrdersForTable(order.tableNumber);
+                    await tablesProvider.loadTables();
+                    if (ctx.mounted) Navigator.pop(ctx);
+                    if (context.mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(isAr ? 'تم إغلاق الطاولة ومحاسبتها بنجاح!' : 'Table closed & completed!'),
+                          backgroundColor: AppTheme.statusGreen,
+                        ),
+                      );
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: AppTheme.primaryCoffee, foregroundColor: Colors.white),
+                  child: Text(isAr ? 'إغلاق ومحاسبة الطاولة ✓' : 'Close & Complete Table ✓'),
+                ),
+              ],
       ),
     );
   }
@@ -321,7 +402,6 @@ class OrderTrackerScreen extends StatelessWidget {
                           final order = ordersProvider.filteredOrders[index];
                           final statusColor = _getStatusColor(order.status);
                           final timeStr = DateFormat('hh:mm a').format(order.createdAt);
-                          final isActive = order.status != 'completed' && order.status != 'cancelled';
 
                           return Card(
                             margin: const EdgeInsets.only(bottom: 14),
@@ -491,54 +571,55 @@ class OrderTrackerScreen extends StatelessWidget {
                                       alignment: WrapAlignment.end,
                                       children: [
                                         // Wi-Fi Print Bill Button
-                                        OutlinedButton.icon(
-                                          onPressed: () async {
-                                            final printRes = await WifiPrinterService.printTableBill(
-                                              ip: settings.printerIp,
-                                              port: settings.printerPort,
-                                              cafeName: settings.cafeName,
-                                              tableName: order.tableName,
-                                              tableNumber: order.tableNumber,
-                                              items: order.items,
-                                              totalAmount: order.totalAmount,
-                                              orderId: order.id,
-                                              waiterName: order.waiterName.isNotEmpty ? order.waiterName : settings.waiterName,
-                                              generalNotes: order.generalNotes,
-                                            );
-                                            if (context.mounted) {
-                                              ScaffoldMessenger.of(context).showSnackBar(
-                                                SnackBar(
-                                                  content: Text(printRes.message),
-                                                  backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
-                                                  duration: const Duration(seconds: 4),
-                                                ),
+                                        if (settings.enablePrinter)
+                                          OutlinedButton.icon(
+                                            onPressed: () async {
+                                              final printRes = await WifiPrinterService.printTableBill(
+                                                ip: settings.printerIp,
+                                                port: settings.printerPort,
+                                                cafeName: settings.cafeName,
+                                                tableName: order.tableName,
+                                                tableNumber: order.tableNumber,
+                                                items: order.items,
+                                                totalAmount: order.totalAmount,
+                                                orderId: order.id,
+                                                waiterName: order.waiterName.isNotEmpty ? order.waiterName : settings.waiterName,
+                                                generalNotes: order.generalNotes,
                                               );
-                                            }
-                                          },
-                                          icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 16),
-                                          label: Text(
-                                            isAr ? 'طباعة 🖨️' : 'Print 🖨️',
-                                            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primaryCoffee),
+                                              if (context.mounted) {
+                                                ScaffoldMessenger.of(context).showSnackBar(
+                                                  SnackBar(
+                                                    content: Text(printRes.message),
+                                                    backgroundColor: printRes.success ? AppTheme.statusGreen : AppTheme.statusRed,
+                                                    duration: const Duration(seconds: 4),
+                                                  ),
+                                                );
+                                              }
+                                            },
+                                            icon: const Icon(Icons.print_rounded, color: AppTheme.primaryCoffee, size: 16),
+                                            label: Text(
+                                              isAr ? 'طباعة 🖨️' : 'Print 🖨️',
+                                              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: AppTheme.primaryCoffee),
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.2),
+                                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                            ),
                                           ),
-                                          style: OutlinedButton.styleFrom(
-                                            side: const BorderSide(color: AppTheme.primaryCoffee, width: 1.2),
-                                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                          ),
-                                        ),
 
-                                        // Dedicated "إرسال الفاتورة النهائية" Button
-                                        if (isActive)
+                                        // Dedicated "إرسال الفاتورة النهائية" Button (Kept for active and paid orders)
+                                        if (order.status != 'cancelled' && (settings.enableTelegram || settings.enableWhatsapp))
                                             ElevatedButton.icon(
                                               onPressed: () async {
                                                 TelegramResult? tgRes;
-                                                if (settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
+                                                if (settings.enableTelegram && settings.telegramBotToken.isNotEmpty && settings.telegramChatId.isNotEmpty) {
                                                   tgRes = await TelegramService.sendFinalBill(
                                                     botToken: settings.telegramBotToken,
                                                     chatId: settings.telegramChatId,
                                                     order: order,
                                                     lang: lang,
                                                   );
-                                                } else {
+                                                } else if (settings.enableWhatsapp) {
                                                   await WhatsAppService.sendFinalBillToCashier(
                                                     cashierPhone: settings.cashierPhone,
                                                     order: order,
@@ -603,8 +684,11 @@ class OrderTrackerScreen extends StatelessWidget {
 
                                           if (order.status == 'served')
                                             ElevatedButton.icon(
-                                              onPressed: () {
-                                                ordersProvider.updateStatus(order.id!, 'completed');
+                                              onPressed: () async {
+                                                await ordersProvider.updateStatus(order.id!, 'completed');
+                                                if (context.mounted) {
+                                                  await Provider.of<TablesProvider>(context, listen: false).loadTables();
+                                                }
                                               },
                                               icon: const Icon(Icons.done_all, size: 18),
                                               label: Text(
