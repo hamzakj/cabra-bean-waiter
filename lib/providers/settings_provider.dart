@@ -8,8 +8,8 @@ class SettingsProvider with ChangeNotifier {
   String _printerIp = '192.168.1.134';
   int _printerPort = 9100;
   bool _autoPrintBill = false;
-  String _telegramBotToken = '';
-  String _telegramChatId = '';
+  String _telegramBotToken = '8660493989:AAHkm_gxp8VKlLXjGEa9O1z7rcWyZESZlxI';
+  String _telegramChatId = '7663363866';
 
   String get cashierPhone => _cashierPhone;
   String get waiterName => _waiterName;
@@ -33,8 +33,8 @@ class SettingsProvider with ChangeNotifier {
     _printerPort = int.tryParse(portStr) ?? 9100;
     final autoPrintStr = await DBHelper.instance.getSetting('auto_print_bill', defaultValue: '0');
     _autoPrintBill = autoPrintStr == '1';
-    _telegramBotToken = await DBHelper.instance.getSetting('telegram_bot_token', defaultValue: '');
-    _telegramChatId = await DBHelper.instance.getSetting('telegram_chat_id', defaultValue: '');
+    _telegramBotToken = await DBHelper.instance.getSetting('telegram_bot_token', defaultValue: '8660493989:AAHkm_gxp8VKlLXjGEa9O1z7rcWyZESZlxI');
+    _telegramChatId = await DBHelper.instance.getSetting('telegram_chat_id', defaultValue: '7663363866');
     notifyListeners();
   }
 

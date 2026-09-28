@@ -269,6 +269,8 @@ class DBHelper {
     await db.insert('settings', {'key': 'waiter_name', 'value': 'أحمد (النادل)'}, conflictAlgorithm: ConflictAlgorithm.ignore);
     await db.insert('settings', {'key': 'language', 'value': 'ar'}, conflictAlgorithm: ConflictAlgorithm.ignore);
     await db.insert('settings', {'key': 'cafe_name', 'value': 'Cabra Bean - كابرا بين'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('settings', {'key': 'telegram_bot_token', 'value': '8660493989:AAHkm_gxp8VKlLXjGEa9O1z7rcWyZESZlxI'}, conflictAlgorithm: ConflictAlgorithm.ignore);
+    await db.insert('settings', {'key': 'telegram_chat_id', 'value': '7663363866'}, conflictAlgorithm: ConflictAlgorithm.ignore);
 
     for (var t in _getInitialTables()) {
       await db.insert('tables', t, conflictAlgorithm: ConflictAlgorithm.ignore);
